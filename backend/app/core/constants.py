@@ -1,0 +1,121 @@
+"""Application constants including pricing and model configurations."""
+
+# AI Provider Configurations
+PROVIDER_CONFIGS = {
+    "openai": {
+        "default_model": "gpt-4o",
+        "env_key": "OPENAI_API_KEY",
+        "supports_streaming": True,
+    },
+    "anthropic": {
+        "default_model": "claude-sonnet-3-5-20240620",
+        "env_key": "ANTHROPIC_API_KEY",
+        "supports_streaming": True,
+    },
+    "google": {
+        "default_model": "gemini-pro",
+        "env_key": "GOOGLE_API_KEY",
+        "supports_streaming": True,
+    },
+    "grok": {
+        "default_model": "grok-beta",
+        "env_key": "GROK_API_KEY",
+        "supports_streaming": True,
+        "base_url": "https://api.x.ai/v1",
+    },
+}
+
+# Pricing per 1K tokens (input, output) in USD
+# Note: These are estimates and should be updated regularly
+PRICING = {
+    "openai:gpt-4o": (5.00, 15.00),
+    "openai:gpt-4-turbo": (10.00, 30.00),
+    "openai:gpt-4": (30.00, 60.00),
+    "anthropic:claude-opus-4": (15.00, 75.00),
+    "anthropic:claude-sonnet-3-5-20240620": (3.00, 15.00),
+    "anthropic:claude-sonnet-3-5": (3.00, 15.00),
+    "anthropic:claude-haiku-3": (0.25, 1.25),
+    "google:gemini-pro": (0.50, 1.50),
+    "google:gemini-1.5-pro": (3.50, 10.50),
+    "grok:grok-beta": (5.00, 10.00),
+}
+
+# Preset temperature mappings
+PRESETS = {
+    "creative": 0.9,
+    "balanced": 0.7,
+    "precise": 0.3,
+}
+
+# Merge templates system prompts
+MERGE_TEMPLATES = {
+    "analytical": """You are an analytical synthesizer. Your task is to merge multiple AI responses into a single, cohesive answer.
+
+Focus on:
+- Logical synthesis of key points
+- Evidence-based consolidation
+- Clear reasoning and structure
+- Identifying common themes and unique insights
+- Maintaining factual accuracy
+
+Create a well-structured response that represents the best thinking from all sources.""",
+    "creative": """You are a creative synthesizer. Your task is to merge multiple AI responses into a single, innovative answer.
+
+Focus on:
+- Novel combinations of ideas
+- Expansive and exploratory thinking
+- Synthesizing unique perspectives
+- Building on creative insights
+- Encouraging bold connections
+
+Create an imaginative response that expands beyond individual contributions.""",
+    "technical": """You are a technical synthesizer. Your task is to merge multiple AI responses into a single, accurate answer.
+
+Focus on:
+- Technical precision and correctness
+- Detailed accuracy
+- Clear technical explanations
+- Verification of claims
+- Consistent terminology
+
+Create a technically sound response that maintains high standards of accuracy.""",
+    "balanced": """You are a balanced synthesizer. Your task is to merge multiple AI responses into a single, well-rounded answer.
+
+Focus on:
+- Integrating diverse perspectives
+- Balanced representation of ideas
+- Clear and accessible language
+- Practical applicability
+- Thoughtful synthesis
+
+Create a comprehensive response that reflects the collective wisdom of all sources.""",
+}
+
+# Session statuses
+SESSION_STATUS = {
+    "PENDING": "pending",
+    "RUNNING": "running",
+    "PAUSED": "paused",
+    "COMPLETED": "completed",
+    "FAILED": "failed",
+}
+
+# Response roles
+RESPONSE_ROLES = {
+    "COUNCIL": "council",
+    "CHAIR": "chair",
+}
+
+# Stream event types
+STREAM_EVENTS = {
+    "ITERATION_START": "iteration_start",
+    "RESPONSE_START": "response_start",
+    "RESPONSE_CHUNK": "response_chunk",
+    "RESPONSE_END": "response_end",
+    "RESPONSE_ERROR": "response_error",
+    "CONSENSUS_START": "consensus_start",
+    "CONSENSUS_CHUNK": "consensus_chunk",
+    "CONSENSUS_END": "consensus_end",
+    "ITERATION_END": "iteration_end",
+    "SESSION_COMPLETE": "session_complete",
+}
