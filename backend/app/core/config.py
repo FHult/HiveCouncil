@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     grok_api_key: str | None = None
 
+    # Model Selection (optional - will use defaults if not specified)
+    openai_model: str | None = None
+    anthropic_model: str | None = None
+    google_model: str | None = None
+    grok_model: str | None = None
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./hivecouncil.db"
 

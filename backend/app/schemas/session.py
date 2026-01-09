@@ -3,6 +3,13 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class ModelConfig(BaseModel):
+    """Model configuration for each provider."""
+
+    provider: str = Field(..., description="Provider name")
+    model: str = Field(..., description="Model name for this provider")
+
+
 class SessionCreate(BaseModel):
     """Schema for creating a new session."""
 
@@ -13,6 +20,10 @@ class SessionCreate(BaseModel):
     preset: str = Field(default="balanced", description="Response preset (creative/balanced/precise)")
     system_prompt: str | None = Field(default=None, description="Global system prompt")
     autopilot: bool = Field(default=False, description="Enable autopilot mode")
+    model_configs: list[ModelConfig] | None = Field(
+        default=None,
+        description="Optional model configuration per provider. If not provided, uses defaults."
+    )
 
 
 class SessionResponse(BaseModel):

@@ -6,38 +6,72 @@ PROVIDER_CONFIGS = {
         "default_model": "gpt-4o",
         "env_key": "OPENAI_API_KEY",
         "supports_streaming": True,
+        "available_models": [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-4",
+            "gpt-3.5-turbo",
+        ],
     },
     "anthropic": {
-        "default_model": "claude-sonnet-3-5-20240620",
+        "default_model": "claude-sonnet-4-20250514",
         "env_key": "ANTHROPIC_API_KEY",
         "supports_streaming": True,
+        "available_models": [
+            "claude-opus-4-20250514",
+            "claude-sonnet-4-20250514",
+            "claude-sonnet-3-5-20241022",
+            "claude-sonnet-3-5-20240620",
+            "claude-haiku-3-5-20241022",
+        ],
     },
     "google": {
-        "default_model": "gemini-pro",
+        "default_model": "gemini-2.0-flash-exp",
         "env_key": "GOOGLE_API_KEY",
         "supports_streaming": True,
+        "available_models": [
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
+            "gemini-pro",
+        ],
     },
     "grok": {
         "default_model": "grok-beta",
         "env_key": "GROK_API_KEY",
         "supports_streaming": True,
         "base_url": "https://api.x.ai/v1",
+        "available_models": [
+            "grok-beta",
+            "grok-vision-beta",
+        ],
     },
 }
 
 # Pricing per 1K tokens (input, output) in USD
 # Note: These are estimates and should be updated regularly
 PRICING = {
-    "openai:gpt-4o": (5.00, 15.00),
+    # OpenAI
+    "openai:gpt-4o": (2.50, 10.00),
+    "openai:gpt-4o-mini": (0.15, 0.60),
     "openai:gpt-4-turbo": (10.00, 30.00),
     "openai:gpt-4": (30.00, 60.00),
-    "anthropic:claude-opus-4": (15.00, 75.00),
+    "openai:gpt-3.5-turbo": (0.50, 1.50),
+    # Anthropic
+    "anthropic:claude-opus-4-20250514": (15.00, 75.00),
+    "anthropic:claude-sonnet-4-20250514": (3.00, 15.00),
+    "anthropic:claude-sonnet-3-5-20241022": (3.00, 15.00),
     "anthropic:claude-sonnet-3-5-20240620": (3.00, 15.00),
-    "anthropic:claude-sonnet-3-5": (3.00, 15.00),
-    "anthropic:claude-haiku-3": (0.25, 1.25),
+    "anthropic:claude-haiku-3-5-20241022": (0.80, 4.00),
+    # Google
+    "google:gemini-2.0-flash-exp": (0.00, 0.00),  # Free during preview
+    "google:gemini-1.5-pro": (1.25, 5.00),
+    "google:gemini-1.5-flash": (0.075, 0.30),
     "google:gemini-pro": (0.50, 1.50),
-    "google:gemini-1.5-pro": (3.50, 10.50),
-    "grok:grok-beta": (5.00, 10.00),
+    # Grok
+    "grok:grok-beta": (5.00, 15.00),
+    "grok:grok-vision-beta": (5.00, 15.00),
 }
 
 # Preset temperature mappings
