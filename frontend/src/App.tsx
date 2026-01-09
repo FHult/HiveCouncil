@@ -1,96 +1,136 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react';
+import { useSessionStore } from '@/store/sessionStore';
+import { sessionApi } from '@/lib/api';
+import { PromptInput } from '@/components/prompt/PromptInput';
+import { SessionDisplay } from '@/components/session/SessionDisplay';
 
 function App() {
-  const [status, setStatus] = useState<string>('Checking...')
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const { currentSession } = useSessionStore();
 
-  // Test backend connection
-  const testBackend = async () => {
-    try {
-      const response = await fetch('/api/sessions/test')
-      const data = await response.json()
-      setStatus(`✓ Connected: ${data.message}`)
-    } catch (error) {
-      setStatus(`✗ Backend not running. Please start the backend server.`)
-    }
-  }
+  // Test backend connection on mount
+  useEffect(() => {
+    const testBackend = async () => {
+      try {
+        await sessionApi.testConnection();
+        setBackendStatus('connected');
+      } catch (error) {
+        setBackendStatus('error');
+      }
+    };
 
-  // Test on mount
-  useState(() => {
-    testBackend()
-  })
+    testBackend();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-6">
-            HiveCouncil
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
-            Multi-AI Council with Consensus Building
-          </p>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">
-              Backend Status
-            </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300 mb-4">
-              {status}
-            </p>
-            <button
-              onClick={testBackend}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              Test Connection
-            </button>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">
-              Setup Instructions
-            </h2>
-            <div className="text-left space-y-4 text-gray-600 dark:text-gray-300">
-              <div>
-                <h3 className="font-semibold text-gray-800 dark:text-white mb-2">
-                  1. Setup Environment Variables
-                </h3>
-                <p>Copy .env.example to .env and add your API keys</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 dark:text-white mb-2">
-                  2. Install Backend Dependencies
-                </h3>
-                <code className="block bg-gray-100 dark:bg-gray-700 p-3 rounded mt-2">
-                  cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-                </code>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 dark:text-white mb-2">
-                  3. Start Backend Server
-                </h3>
-                <code className="block bg-gray-100 dark:bg-gray-700 p-3 rounded mt-2">
-                  cd backend && source venv/bin/activate && uvicorn app.main:app --reload
-                </code>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 dark:text-white mb-2">
-                  4. Frontend is Running
-                </h3>
-                <p>This frontend is already running on port 5173</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">HiveCouncil</h1>
+              <p className="text-sm text-gray-600">Multi-AI Consensus Building</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-sm">
+                {backendStatus === 'checking' && (
+                  <span className="text-gray-500">⚙️ Checking...</span>
+                )}
+                {backendStatus === 'connected' && (
+                  <span className="text-green-600">✓ Backend Connected</span>
+                )}
+                {backendStatus === 'error' && (
+                  <span className="text-red-600">✗ Backend Offline</span>
+                )}
               </div>
             </div>
           </div>
-
-          <div className="mt-8 text-sm text-gray-500 dark:text-gray-400">
-            <p>Phase 1: Foundation - Core Loop Implementation</p>
-            <p className="mt-2">
-              Full UI and features coming in subsequent phases
-            </p>
-          </div>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {backendStatus === 'error' ? (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-red-900 mb-4">
+                Backend Not Running
+              </h2>
+              <p className="text-red-700 mb-4">
+                The HiveCouncil backend server is not running. Please start it to use the application.
+              </p>
+              <div className="bg-white rounded border border-red-200 p-4 font-mono text-sm">
+                <p className="text-gray-600 mb-2">Start the backend:</p>
+                <code className="text-gray-900">
+                  cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+                </code>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Welcome Message (show if no session) */}
+            {!currentSession && (
+              <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Welcome to HiveCouncil
+                </h2>
+                <p className="text-gray-600">
+                  Create a council of AI models to discuss your question and build consensus through iterations.
+                </p>
+              </div>
+            )}
+
+            {/* Prompt Input */}
+            <PromptInput />
+
+            {/* Session Display */}
+            {currentSession && <SessionDisplay />}
+
+            {/* Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg shadow-sm border p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">🤖 Multi-Provider</h3>
+                <p className="text-sm text-gray-600">
+                  OpenAI, Anthropic, Google, and Grok work together
+                </p>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">🎯 Model Selection</h3>
+                <p className="text-sm text-gray-600">
+                  Choose specific models for each provider
+                </p>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">🔄 Iterative</h3>
+                <p className="text-sm text-gray-600">
+                  Refine consensus through multiple cycles
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-white/80 backdrop-blur-sm mt-12">
+        <div className="container mx-auto px-4 py-6 text-center text-sm text-gray-600">
+          <p>HiveCouncil - Built with React, FastAPI, and AI</p>
+          <p className="mt-1">
+            <a
+              href="https://github.com/FHult/HiveCouncil"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 hover:text-indigo-700"
+            >
+              View on GitHub
+            </a>
+          </p>
+        </div>
+      </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
