@@ -20,6 +20,14 @@ export interface ModelConfig {
   model: string;
 }
 
+export interface FileAttachment {
+  filename: string;
+  content_type: string;
+  size: number;
+  extracted_text?: string;
+  base64_data?: string;
+}
+
 export interface SessionConfig {
   prompt: string;
   chair: string;
@@ -29,6 +37,7 @@ export interface SessionConfig {
   system_prompt?: string;
   autopilot: boolean;
   model_configs?: ModelConfig[];
+  files?: FileAttachment[];
 }
 
 export interface SessionResponse {
@@ -71,16 +80,48 @@ export interface Session {
 }
 
 export interface StreamEvent {
-  type: string;
+  type: 'session_created' | 'status' | 'initial_response' | 'merge' | 'feedback' | 'complete' | 'error';
+  session_id?: number;
+  message?: string;
   provider?: string;
-  model?: string;
   content?: string;
   iteration?: number;
-  input_tokens?: number;
-  output_tokens?: number;
-  estimated_cost?: number;
+  tokens?: {
+    input: number;
+    output: number;
+  };
+  cost?: number;
+  done?: boolean;
+  response_id?: number;
+}
+
+export interface CouncilResponse {
+  id: number;
+  provider: string;
+  content: string;
+  iteration: number;
+  type: 'initial_response' | 'merge' | 'feedback';
+  tokens: {
+    input: number;
+    output: number;
+  };
+  cost: number;
+}
+
+export interface SessionState {
+  sessionId: number | null;
+  status: 'idle' | 'running' | 'completed' | 'error';
+  currentIteration: number;
+  totalIterations: number;
+  responses: CouncilResponse[];
+  mergedResponses: CouncilResponse[];
+  statusMessage: string;
+  totalCost: number;
+  totalTokens: {
+    input: number;
+    output: number;
+  };
   error?: string;
-  error_code?: string;
 }
 
 export type Template = 'analytical' | 'creative' | 'technical' | 'balanced';

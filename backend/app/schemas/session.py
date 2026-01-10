@@ -10,6 +10,16 @@ class ModelConfig(BaseModel):
     model: str = Field(..., description="Model name for this provider")
 
 
+class FileAttachment(BaseModel):
+    """File attachment for a session."""
+
+    filename: str = Field(..., description="Original filename")
+    content_type: str = Field(..., description="MIME type of the file")
+    size: int = Field(..., description="File size in bytes")
+    extracted_text: str | None = Field(default=None, description="Extracted text content")
+    base64_data: str | None = Field(default=None, description="Base64 encoded image data for vision models")
+
+
 class SessionCreate(BaseModel):
     """Schema for creating a new session."""
 
@@ -23,6 +33,10 @@ class SessionCreate(BaseModel):
     model_configs: list[ModelConfig] | None = Field(
         default=None,
         description="Optional model configuration per provider. If not provided, uses defaults."
+    )
+    files: list[FileAttachment] | None = Field(
+        default=None,
+        description="Optional file attachments to include with the prompt"
     )
 
 

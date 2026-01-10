@@ -1,44 +1,84 @@
 """Session API routes."""
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.schemas.session import SessionCreate, SessionResponse
 from app.models.session import Session as SessionModel
+from app.services.session_orchestrator import SessionOrchestrator
 
 router = APIRouter()
 
 
-@router.post("/session/create", response_model=SessionResponse)
+@router.post("/session/create")
 async def create_session(
     session_data: SessionCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Create a new council session.
+    Create and run a new council session with Server-Sent Events streaming.
 
     Args:
         session_data: Session configuration
         db: Database session
 
     Returns:
-        SessionResponse: Created session information
+        StreamingResponse: SSE stream of session progress
     """
-    # Create session model
-    session = SessionModel(
-        prompt=session_data.prompt,
-        chair_provider=session_data.chair,
-        total_iterations=session_data.iterations,
-        merge_template=session_data.template,
-        preset=session_data.preset,
-        system_prompt=session_data.system_prompt,
-        autopilot=session_data.autopilot,
-        status="pending",
+    orchestrator = SessionOrchestrator(db)
+
+    # Create session
+    session = await orchestrator.create_session(session_data)
+
+    async def event_generator():
+        """Generate SSE events for session progress."""
+        try:
+            # Send initial session info
+            yield f"data: {json.dumps({'type': 'session_created', 'session_id': session.id})}\n\n"
+
+            # Run session and stream updates
+            async for update in orchestrator.run_session(session):
+                yield f"data: {json.dumps(update)}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
     )
 
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+
+@router.get("/session/{session_id}", response_model=SessionResponse)
+async def get_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get session details.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        SessionResponse: Session information
+    """
+    result = await db.execute(
+        select(SessionModel).where(SessionModel.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
 
     return SessionResponse(
         session_id=session.id,

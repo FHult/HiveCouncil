@@ -1,5 +1,5 @@
 """OpenAI provider implementation."""
-import tiktoken
+# import tiktoken  # Temporarily disabled - use fallback token counting
 from openai import AsyncOpenAI
 from typing import AsyncGenerator
 
@@ -16,12 +16,8 @@ class OpenAIProvider(AIProvider):
         self.client = AsyncOpenAI(api_key=api_key)
         self.name = "openai"
 
-        # Initialize tokenizer
-        try:
-            self.tokenizer = tiktoken.encoding_for_model(self.model)
-        except KeyError:
-            # Fallback to cl100k_base for unknown models
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        # Tokenizer temporarily disabled - using fallback estimation
+        # TODO: Re-enable tiktoken once Python 3.13 support is stable
 
     async def stream_completion(
         self,
@@ -29,6 +25,7 @@ class OpenAIProvider(AIProvider):
         system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2000,
+        image_data: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream completion from OpenAI."""
         messages = []
@@ -36,7 +33,22 @@ class OpenAIProvider(AIProvider):
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
 
-        messages.append({"role": "user", "content": prompt})
+        # Build user message with optional image
+        if image_data:
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_data}"
+                        }
+                    }
+                ]
+            })
+        else:
+            messages.append({"role": "user", "content": prompt})
 
         try:
             stream = await self.client.chat.completions.create(
@@ -54,13 +66,17 @@ class OpenAIProvider(AIProvider):
         except Exception as e:
             raise Exception(f"OpenAI API error: {str(e)}")
 
+    def supports_vision(self) -> bool:
+        """Check if model supports vision."""
+        # GPT-4o and GPT-4 Turbo support vision
+        vision_models = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo"}
+        return self.model in vision_models
+
     def count_tokens(self, text: str) -> int:
-        """Count tokens using tiktoken."""
-        try:
-            return len(self.tokenizer.encode(text))
-        except Exception:
-            # Fallback: rough estimate (4 chars per token)
-            return len(text) // 4
+        """Count tokens using fallback estimation."""
+        # Fallback: rough estimate (4 chars per token)
+        # TODO: Re-enable tiktoken for accurate counting
+        return len(text) // 4
 
     def get_default_model(self) -> str:
         """Get default OpenAI model."""

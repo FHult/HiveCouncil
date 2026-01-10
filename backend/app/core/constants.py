@@ -81,6 +81,22 @@ PRESETS = {
     "precise": 0.3,
 }
 
+# Preset configurations (full details)
+PRESET_CONFIGS = {
+    "creative": {
+        "temperature": 0.9,
+        "description": "More varied and creative responses",
+    },
+    "balanced": {
+        "temperature": 0.7,
+        "description": "Balanced between creativity and consistency",
+    },
+    "precise": {
+        "temperature": 0.3,
+        "description": "More focused and consistent responses",
+    },
+}
+
 # Merge templates system prompts
 MERGE_TEMPLATES = {
     "analytical": """You are an analytical synthesizer. Your task is to merge multiple AI responses into a single, cohesive answer.

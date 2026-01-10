@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
 import { sessionApi } from '@/lib/api';
 import { PromptInput } from '@/components/prompt/PromptInput';
-import { SessionDisplay } from '@/components/session/SessionDisplay';
+import { LiveSession } from '@/components/session/LiveSession';
 
 function App() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-  const { currentSession } = useSessionStore();
+  const { status: sessionStatus } = useSessionStore();
 
   // Test backend connection on mount
   useEffect(() => {
@@ -71,7 +71,7 @@ function App() {
         ) : (
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Welcome Message (show if no session) */}
-            {!currentSession && (
+            {sessionStatus === 'idle' && (
               <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
                   Welcome to HiveCouncil
@@ -85,8 +85,8 @@ function App() {
             {/* Prompt Input */}
             <PromptInput />
 
-            {/* Session Display */}
-            {currentSession && <SessionDisplay />}
+            {/* Live Session Display */}
+            <LiveSession />
 
             {/* Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

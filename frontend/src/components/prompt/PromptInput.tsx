@@ -5,7 +5,8 @@ import { useUIStore } from '@/store/uiStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from './ModelSelector';
-import type { SessionConfig, Template, Preset } from '@/types';
+import { FileUpload } from './FileUpload';
+import type { SessionConfig, Template, Preset, FileAttachment } from '@/types';
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState('');
@@ -14,8 +15,10 @@ export function PromptInput() {
   const [template, setTemplate] = useState<Template>('balanced');
   const [preset, setPreset] = useState<Preset>('balanced');
   const [autopilot, setAutopilot] = useState(false);
+  const [files, setFiles] = useState<FileAttachment[]>([]);
 
-  const { createSession, isStreaming, error } = useSessionStore();
+  const { startSession, status, error } = useSessionStore();
+  const isStreaming = status === 'running';
   const { providers, getModelConfigs } = useProvidersStore();
   const { showModelSelector, toggleModelSelector, showAdvancedOptions, toggleAdvancedOptions } = useUIStore();
 
@@ -38,9 +41,15 @@ export function PromptInput() {
       preset,
       autopilot,
       model_configs: getModelConfigs(),
+      files: files.length > 0 ? files : undefined,
     };
 
-    await createSession(config);
+    await startSession(config);
+
+    // Clear files after submission
+    if (files.length > 0) {
+      setFiles([]);
+    }
   };
 
   return (
@@ -65,6 +74,9 @@ export function PromptInput() {
                 disabled={isStreaming}
               />
             </div>
+
+            {/* File Upload */}
+            <FileUpload files={files} onFilesChange={setFiles} disabled={isStreaming} />
 
             {/* Main Controls */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

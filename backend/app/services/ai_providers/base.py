@@ -19,6 +19,7 @@ class AIProvider(ABC):
         system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2000,
+        image_data: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream completion tokens from the AI provider.
@@ -28,11 +29,21 @@ class AIProvider(ABC):
             system_prompt: Optional system prompt
             temperature: Temperature for response randomness
             max_tokens: Maximum tokens in response
+            image_data: Optional base64 encoded image data for vision models
 
         Yields:
             str: Token strings as they arrive
         """
         pass
+
+    def supports_vision(self) -> bool:
+        """
+        Check if this provider supports vision/image inputs.
+
+        Returns:
+            bool: True if provider supports vision
+        """
+        return False
 
     @abstractmethod
     def count_tokens(self, text: str) -> int:
