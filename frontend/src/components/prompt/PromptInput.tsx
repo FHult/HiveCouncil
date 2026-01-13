@@ -5,13 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUpload } from './FileUpload';
 import CouncilMemberEditor from '@/components/CouncilMemberEditor';
-import type { SessionConfig, Template, Preset, FileAttachment, CouncilMember } from '@/types';
+import type { SessionConfig, Preset, FileAttachment, CouncilMember } from '@/types';
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState('');
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>([]);
   const [iterations, setIterations] = useState(3);
-  const [template, setTemplate] = useState<Template>('balanced');
   const [preset, setPreset] = useState<Preset>('balanced');
   const [autopilot, setAutopilot] = useState(false);
   const [files, setFiles] = useState<FileAttachment[]>([]);
@@ -37,7 +36,7 @@ export function PromptInput() {
       prompt: prompt.trim(),
       council_members: councilMembers,
       iterations,
-      template,
+      template: 'balanced', // Default template, chair personality drives synthesis
       preset,
       autopilot,
       files: files.length > 0 ? files : undefined,
@@ -139,23 +138,6 @@ export function PromptInput() {
             {/* Advanced Options */}
             {showAdvancedOptions && (
               <div className="space-y-4 border-t pt-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Merge Template
-                  </label>
-                  <select
-                    value={template}
-                    onChange={(e) => setTemplate(e.target.value as Template)}
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    disabled={isStreaming}
-                  >
-                    <option value="analytical">Analytical</option>
-                    <option value="creative">Creative</option>
-                    <option value="technical">Technical</option>
-                    <option value="balanced">Balanced</option>
-                  </select>
-                </div>
-
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"

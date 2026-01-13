@@ -502,8 +502,12 @@ Provide constructive feedback on:
             }
             return
 
-        # Get merge template
-        template = MERGE_TEMPLATES.get(session.merge_template, MERGE_TEMPLATES["balanced"])
+        # Get chair's personality system prompt if using council members
+        chair_system_prompt = None
+        if hasattr(self, 'council_members') and self.council_members:
+            chair_member = next((m for m in self.council_members if m.is_chair), None)
+            if chair_member:
+                chair_system_prompt = self.member_personalities.get(chair_member.id)
 
         # Build merge prompt
         responses_text = "\n\n".join([
@@ -512,33 +516,31 @@ Provide constructive feedback on:
         ])
 
         if iteration == 1:
-            merge_prompt = f"""{template}
+            merge_prompt = f"""As the chair of this council, your task is to synthesize the following responses into a comprehensive, cohesive answer.
 
 Original prompt: {session.prompt}
 
-Responses to merge:
+Council responses to merge:
 {responses_text}
 
-Please create a comprehensive merged response that synthesizes all of the above responses."""
+Please create a well-integrated merged response that represents the collective wisdom of the council."""
         else:
-            # For iteration cycles, adjust the template
-            merge_prompt = f"""{template}
-
-As the chair, review the feedback from the council and create an improved merged response.
+            # For iteration cycles
+            merge_prompt = f"""As the chair, review the feedback from your council members and create an improved merged response.
 
 Original prompt: {session.prompt}
 
 Council feedback:
 {responses_text}
 
-Please create an improved merged response incorporating the feedback above."""
+Please create an enhanced merged response that incorporates this feedback."""
 
-        # Get chair's merged response
+        # Get chair's merged response with their personality
         temperature = self._get_temperature_for_session(session)
 
         try:
             content, input_tokens, output_tokens, cost = await self._get_provider_response(
-                chair_provider, merge_prompt, temperature
+                chair_provider, merge_prompt, temperature, chair_system_prompt
             )
 
             # Save to database
