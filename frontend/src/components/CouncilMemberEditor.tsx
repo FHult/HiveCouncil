@@ -150,7 +150,7 @@ export default function CouncilMemberEditor({
                       {member.is_chair && <span className="chair-badge">★ Chair</span>}
                     </div>
                     <div className="member-subtitle">
-                      {archetypeInfo?.name || 'Balanced'} • {getProviderDisplayName(member.provider)}
+                      {archetypeInfo?.name || 'Balanced'} • {getProviderDisplayName(member.provider)} • {member.model}
                     </div>
                   </div>
                 </div>

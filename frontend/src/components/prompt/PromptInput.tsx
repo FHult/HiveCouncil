@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
 import { useProvidersStore } from '@/store/providersStore';
-import { useUIStore } from '@/store/uiStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ModelSelector } from './ModelSelector';
 import { FileUpload } from './FileUpload';
 import CouncilMemberEditor from '@/components/CouncilMemberEditor';
 import type { SessionConfig, Template, Preset, FileAttachment, CouncilMember } from '@/types';
@@ -17,15 +15,11 @@ export function PromptInput() {
   const [preset, setPreset] = useState<Preset>('balanced');
   const [autopilot, setAutopilot] = useState(false);
   const [files, setFiles] = useState<FileAttachment[]>([]);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const { startSession, status, error } = useSessionStore();
   const isStreaming = status === 'running';
-  const { providers, getModelConfigs } = useProvidersStore();
-  const { showModelSelector, toggleModelSelector, showAdvancedOptions, toggleAdvancedOptions } = useUIStore();
-
-  const configuredProviders = Object.keys(providers).filter(
-    (name) => providers[name]?.configured
-  );
+  const { providers } = useProvidersStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +129,7 @@ export function PromptInput() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={toggleAdvancedOptions}
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
                 className="text-indigo-600"
               >
                 {showAdvancedOptions ? '▼' : '▶'} Advanced Options
@@ -178,19 +172,6 @@ export function PromptInput() {
               </div>
             )}
 
-            {/* Model Selection Toggle */}
-            <div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={toggleModelSelector}
-                className="text-indigo-600"
-              >
-                {showModelSelector ? '▼' : '▶'} Model Selection
-              </Button>
-            </div>
-
             {/* Error Display */}
             {error && (
               <div className="rounded-md bg-red-50 border border-red-200 p-4">
@@ -218,8 +199,6 @@ export function PromptInput() {
         </CardContent>
       </Card>
 
-      {/* Model Selector */}
-      {showModelSelector && <ModelSelector />}
     </div>
   );
 }
