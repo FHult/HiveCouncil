@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     @property
     def configured_providers(self) -> list[str]:
-        """Return list of providers with valid API keys."""
+        """Return list of providers with valid API keys or local providers."""
         providers = []
         if self.openai_api_key:
             providers.append("openai")
@@ -48,6 +48,10 @@ class Settings(BaseSettings):
             providers.append("google")
         if self.grok_api_key:
             providers.append("grok")
+
+        # Always include Ollama (local, no API key needed)
+        providers.append("ollama")
+
         return providers
 
 

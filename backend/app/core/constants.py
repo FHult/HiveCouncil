@@ -48,11 +48,12 @@ PROVIDER_CONFIGS = {
         ],
     },
     "ollama": {
-        "default_model": "llama3.1",
+        "default_model": "phi3:mini",
         "env_key": None,  # No API key needed for local
         "supports_streaming": True,
         "base_url": "http://localhost:11434",
         "available_models": [
+            "phi3:mini",
             "llama3.1",
             "llama3.1:70b",
             "llama3",

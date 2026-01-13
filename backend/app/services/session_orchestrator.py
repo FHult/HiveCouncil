@@ -28,6 +28,11 @@ class SessionOrchestrator:
         self.file_context = ""  # Extracted text from files
         self.image_data = None  # Base64 image data for vision models
 
+    def _get_temperature_for_session(self, session: Session) -> float:
+        """Get temperature from session preset."""
+        preset_config = PRESET_CONFIGS.get(session.preset, PRESET_CONFIGS["balanced"])
+        return preset_config["temperature"]
+
     async def create_session(self, config: SessionCreate) -> Session:
         """Create a new session in the database."""
         # Map model configs to dict for provider factory
@@ -36,8 +41,10 @@ class SessionOrchestrator:
             for mc in config.model_configs:
                 model_configs[mc.provider] = mc.model
 
-        # Update provider factory with runtime model configs
-        self.provider_factory = ProviderFactory(model_configs=model_configs)
+        # Create provider factory with runtime model configs (preserves API keys from env)
+        if model_configs:
+            self.provider_factory = ProviderFactory(model_configs=model_configs)
+        # Otherwise use the existing factory initialized with default settings
 
         # Process file attachments
         if config.files:
@@ -59,11 +66,10 @@ class SessionOrchestrator:
         # Create session record
         session = Session(
             prompt=config.prompt,
-            chair=config.chair,
-            iterations=config.iterations,
-            template=config.template,
+            chair_provider=config.chair,
+            total_iterations=config.iterations,
+            merge_template=config.template,
             preset=config.preset,
-            temperature=temperature,
             autopilot=config.autopilot,
             status="running",
         )
@@ -101,7 +107,7 @@ class SessionOrchestrator:
                 return
 
             # Phase 2: Chair creates initial merge
-            yield {"type": "status", "message": f"Chair ({session.chair}) is merging responses..."}
+            yield {"type": "status", "message": f"Chair ({session.chair_provider}) is merging responses..."}
 
             merged_response = None
             async for update in self._create_merge(session, initial_responses, iteration=1):
@@ -109,9 +115,9 @@ class SessionOrchestrator:
                 if update.get("done"):
                     merged_response = update
 
-            # Phase 3: Iteration cycles (if iterations > 1)
-            for iteration in range(2, session.iterations + 1):
-                yield {"type": "status", "message": f"Starting iteration {iteration}/{session.iterations}..."}
+            # Phase 3: Iteration cycles (if total_iterations > 1)
+            for iteration in range(2, session.total_iterations + 1):
+                yield {"type": "status", "message": f"Starting iteration {iteration}/{session.total_iterations}..."}
 
                 # Collect feedback from council on the merged response
                 feedback_responses = []
@@ -148,29 +154,52 @@ class SessionOrchestrator:
         if not providers:
             return
 
-        # Create tasks for all providers
-        tasks = []
-        provider_names = []
+        # Create tasks for all providers with their names
+        provider_names = self.provider_factory.get_provider_names()
 
-        for name, provider in providers.items():
-            tasks.append(self._get_provider_response(provider, session.prompt, session.temperature))
-            provider_names.append(name)
+        temperature = self._get_temperature_for_session(session)
+
+        # Create wrapper coroutines that return provider name and model with result
+        async def get_response_with_name(provider, name, prompt, temp):
+            try:
+                result = await self._get_provider_response(provider, prompt, temp)
+                model = getattr(provider, 'model', 'unknown')
+                return name, model, result, None
+            except Exception as e:
+                return name, None, None, e
+
+        # Create tasks for all providers
+        tasks = [
+            get_response_with_name(provider, name, session.prompt, temperature)
+            for provider, name in zip(providers, provider_names)
+        ]
 
         # Run all providers in parallel and yield results as they complete
-        for task, provider_name in zip(asyncio.as_completed(tasks), provider_names):
+        for coro in asyncio.as_completed(tasks):
+            provider_name, model, result, error = await coro
+
+            if error:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "message": f"Failed to get response: {str(error)}",
+                }
+                continue
+
             try:
-                content, input_tokens, output_tokens, cost = await task
+                content, input_tokens, output_tokens, cost = result
 
                 # Save to database
                 response = Response(
                     session_id=session.id,
                     provider=provider_name,
+                    model=model,
                     iteration=1,
-                    response_type="initial",
+                    role="council",
                     content=content,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
-                    cost=cost,
+                    estimated_cost=cost,
                 )
                 self.db.add(response)
                 await self.db.commit()
@@ -190,7 +219,7 @@ class SessionOrchestrator:
                 yield {
                     "type": "error",
                     "provider": provider_name,
-                    "message": f"Failed to get response: {str(e)}",
+                    "message": f"Failed to save response: {str(e)}",
                 }
 
     async def _collect_feedback(
@@ -215,29 +244,50 @@ Provide constructive feedback on:
 3. Any missing perspectives or considerations
 4. Specific suggestions for enhancement"""
 
-        # Create tasks for all providers
-        tasks = []
-        provider_names = []
+        # Create wrapper coroutines that return provider name and model with result
+        async def get_feedback_with_name(provider, name, prompt, temp):
+            try:
+                result = await self._get_provider_response(provider, prompt, temp)
+                model = getattr(provider, 'model', 'unknown')
+                return name, model, result, None
+            except Exception as e:
+                return name, None, None, e
 
-        for name, provider in providers.items():
-            tasks.append(self._get_provider_response(provider, feedback_prompt, session.temperature))
-            provider_names.append(name)
+        provider_names = self.provider_factory.get_provider_names()
+        temperature = self._get_temperature_for_session(session)
+
+        # Create tasks for all providers
+        tasks = [
+            get_feedback_with_name(provider, name, feedback_prompt, temperature)
+            for provider, name in zip(providers, provider_names)
+        ]
 
         # Run all providers in parallel
-        for task, provider_name in zip(asyncio.as_completed(tasks), provider_names):
+        for coro in asyncio.as_completed(tasks):
+            provider_name, model, result, error = await coro
+
+            if error:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "message": f"Failed to get feedback: {str(error)}",
+                }
+                continue
+
             try:
-                content, input_tokens, output_tokens, cost = await task
+                content, input_tokens, output_tokens, cost = result
 
                 # Save to database
                 response = Response(
                     session_id=session.id,
                     provider=provider_name,
+                    model=model,
                     iteration=iteration,
-                    response_type="feedback",
+                    role="council",
                     content=content,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
-                    cost=cost,
+                    estimated_cost=cost,
                 )
                 self.db.add(response)
                 await self.db.commit()
@@ -265,17 +315,17 @@ Provide constructive feedback on:
         self, session: Session, responses: list[dict], iteration: int
     ) -> AsyncGenerator[dict, None]:
         """Chair creates a merged response from all inputs."""
-        chair_provider = self.provider_factory.get_provider(session.chair)
+        chair_provider = self.provider_factory.get_provider(session.chair_provider)
 
         if not chair_provider:
             yield {
                 "type": "error",
-                "message": f"Chair provider '{session.chair}' is not configured",
+                "message": f"Chair provider '{session.chair_provider}' is not configured",
             }
             return
 
         # Get merge template
-        template = MERGE_TEMPLATES.get(session.template, MERGE_TEMPLATES["balanced"])
+        template = MERGE_TEMPLATES.get(session.merge_template, MERGE_TEMPLATES["balanced"])
 
         # Build merge prompt
         responses_text = "\n\n".join([
@@ -306,21 +356,24 @@ Council feedback:
 Please create an improved merged response incorporating the feedback above."""
 
         # Get chair's merged response
+        temperature = self._get_temperature_for_session(session)
+
         try:
             content, input_tokens, output_tokens, cost = await self._get_provider_response(
-                chair_provider, merge_prompt, session.temperature
+                chair_provider, merge_prompt, temperature
             )
 
             # Save to database
             response = Response(
                 session_id=session.id,
-                provider=session.chair,
+                provider=session.chair_provider,
+                model=getattr(chair_provider, 'model', 'unknown'),
                 iteration=iteration,
-                response_type="merge",
+                role="chair",
                 content=content,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                cost=cost,
+                estimated_cost=cost,
             )
             self.db.add(response)
             await self.db.commit()
@@ -329,7 +382,7 @@ Please create an improved merged response incorporating the feedback above."""
             yield {
                 "type": "merge",
                 "iteration": iteration,
-                "provider": session.chair,
+                "provider": session.chair_provider,
                 "content": content,
                 "tokens": {"input": input_tokens, "output": output_tokens},
                 "cost": cost,
