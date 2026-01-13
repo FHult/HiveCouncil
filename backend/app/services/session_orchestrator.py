@@ -35,16 +35,30 @@ class SessionOrchestrator:
 
     async def create_session(self, config: SessionCreate) -> Session:
         """Create a new session in the database."""
-        # Map model configs to dict for provider factory
-        model_configs = {}
-        if config.model_configs:
-            for mc in config.model_configs:
-                model_configs[mc.provider] = mc.model
+        import json
+        from app.core.personality_archetypes import get_archetype_system_prompt
 
-        # Create provider factory with runtime model configs (preserves API keys from env)
+        # Store council members configuration for use during execution
+        self.council_members = config.council_members
+
+        # Build model configs from council members
+        model_configs = {}
+        for member in config.council_members:
+            model_configs[member.provider] = member.model
+
+        # Create provider factory with runtime model configs
         if model_configs:
             self.provider_factory = ProviderFactory(model_configs=model_configs)
-        # Otherwise use the existing factory initialized with default settings
+
+        # Store personality system prompts for each member
+        self.member_personalities = {}
+        for member in config.council_members:
+            # Generate system prompt from archetype + custom personality
+            personality_prompt = get_archetype_system_prompt(
+                member.archetype,
+                member.custom_personality
+            )
+            self.member_personalities[member.id] = personality_prompt
 
         # Process file attachments
         if config.files:
@@ -63,16 +77,17 @@ class SessionOrchestrator:
         preset_config = PRESET_CONFIGS.get(config.preset, PRESET_CONFIGS["balanced"])
         temperature = preset_config["temperature"]
 
-        # Serialize selected providers to JSON if provided
-        import json
-        selected_providers_json = None
-        if config.selected_providers:
-            selected_providers_json = json.dumps(config.selected_providers)
+        # Find the chair member
+        chair_member = next((m for m in config.council_members if m.is_chair), config.council_members[0])
+
+        # Serialize council members and selected providers
+        council_members_json = json.dumps([m.dict() for m in config.council_members])
+        selected_providers_json = json.dumps([m.provider for m in config.council_members])
 
         # Create session record
         session = Session(
             prompt=config.prompt,
-            chair_provider=config.chair,
+            chair_provider=chair_member.provider,
             total_iterations=config.iterations,
             merge_template=config.template,
             preset=config.preset,
@@ -185,35 +200,57 @@ class SessionOrchestrator:
 
         temperature = self._get_temperature_for_session(session)
 
-        # Create wrapper coroutines that return provider name and model with result
-        async def get_response_with_name(provider, name, prompt, temp):
+        # Create wrapper coroutines that return provider name, model, and member info with result
+        async def get_response_with_name(provider, name, member_id, prompt, temp, system_prompt):
             try:
-                result = await self._get_provider_response(provider, prompt, temp)
+                result = await self._get_provider_response(provider, prompt, temp, system_prompt)
                 model = getattr(provider, 'model', 'unknown')
-                return name, model, result, None
+                return name, model, member_id, result, None
             except Exception as e:
-                return name, None, None, e
+                return name, None, member_id, None, e
 
-        # Create tasks for all providers
-        tasks = [
-            get_response_with_name(provider, name, session.prompt, temperature)
-            for provider, name in zip(providers, provider_names)
-        ]
+        # Create tasks for all council members (supporting multiple members per provider)
+        tasks = []
+        if hasattr(self, 'council_members') and self.council_members:
+            # New council member system
+            for member in self.council_members:
+                provider = self.provider_factory.get_provider(member.provider)
+                if provider:
+                    system_prompt = self.member_personalities.get(member.id)
+                    tasks.append(get_response_with_name(
+                        provider, member.provider, member.id,
+                        session.prompt, temperature, system_prompt
+                    ))
+        else:
+            # Legacy provider system (backward compatibility)
+            for provider, name in zip(providers, provider_names):
+                tasks.append(get_response_with_name(
+                    provider, name, f"legacy_{name}",
+                    session.prompt, temperature, None
+                ))
 
-        # Run all providers in parallel and yield results as they complete
+        # Run all council members in parallel and yield results as they complete
         for coro in asyncio.as_completed(tasks):
-            provider_name, model, result, error = await coro
+            provider_name, model, member_id, result, error = await coro
 
             if error:
                 yield {
                     "type": "error",
                     "provider": provider_name,
+                    "member_id": member_id,
                     "message": f"Failed to get response: {str(error)}",
                 }
                 continue
 
             try:
                 content, input_tokens, output_tokens, cost = result
+
+                # Get member role for display
+                member_role = provider_name
+                if hasattr(self, 'council_members') and self.council_members:
+                    member = next((m for m in self.council_members if m.id == member_id), None)
+                    if member:
+                        member_role = member.role
 
                 # Save to database
                 response = Response(
@@ -234,6 +271,8 @@ class SessionOrchestrator:
                 yield {
                     "type": "initial_response",
                     "provider": provider_name,
+                    "member_role": member_role,
+                    "member_id": member_id,
                     "content": content,
                     "tokens": {"input": input_tokens, "output": output_tokens},
                     "cost": cost,
@@ -441,10 +480,16 @@ Please create an improved merged response incorporating the feedback above."""
             }
 
     async def _get_provider_response(
-        self, provider, prompt: str, temperature: float
+        self, provider, prompt: str, temperature: float, system_prompt: str | None = None
     ) -> tuple[str, int, int, float]:
         """
         Get a complete response from a provider.
+
+        Args:
+            provider: The AI provider instance
+            prompt: The user prompt
+            temperature: Temperature for generation
+            system_prompt: Optional system prompt (personality/role instructions)
 
         Returns: (content, input_tokens, output_tokens, cost)
         """
@@ -460,9 +505,10 @@ Please create an improved merged response incorporating the feedback above."""
         if self.image_data and hasattr(provider, 'supports_vision') and provider.supports_vision():
             image_to_send = self.image_data
 
-        # Collect streamed response
+        # Collect streamed response with personality system prompt
         async for chunk in provider.stream_completion(
             prompt=full_prompt,
+            system_prompt=system_prompt,
             temperature=temperature,
             max_tokens=4000,
             image_data=image_to_send,
