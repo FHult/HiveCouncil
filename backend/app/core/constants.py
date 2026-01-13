@@ -47,6 +47,29 @@ PROVIDER_CONFIGS = {
             "grok-vision-beta",
         ],
     },
+    "ollama": {
+        "default_model": "llama3.1",
+        "env_key": None,  # No API key needed for local
+        "supports_streaming": True,
+        "base_url": "http://localhost:11434",
+        "available_models": [
+            "llama3.1",
+            "llama3.1:70b",
+            "llama3",
+            "mistral",
+            "mistral-nemo",
+            "phi3",
+            "phi3:medium",
+            "gemma2",
+            "gemma2:27b",
+            "qwen2",
+            "qwen2:7b",
+            "codellama",
+            "llava",  # Vision model
+            "llava-phi3",  # Vision model
+        ],
+        "is_local": True,
+    },
 }
 
 # Pricing per 1K tokens (input, output) in USD

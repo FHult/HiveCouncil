@@ -3,9 +3,13 @@ import { useSessionStore } from '@/store/sessionStore';
 import { sessionApi } from '@/lib/api';
 import { PromptInput } from '@/components/prompt/PromptInput';
 import { LiveSession } from '@/components/session/LiveSession';
+import { OllamaManager } from '@/components/ollama/OllamaManager';
+
+type TabType = 'council' | 'ollama';
 
 function App() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [activeTab, setActiveTab] = useState<TabType>('council');
   const { status: sessionStatus } = useSessionStore();
 
   // Test backend connection on mount
@@ -49,6 +53,36 @@ function App() {
         </div>
       </header>
 
+      {/* Tab Navigation */}
+      {backendStatus === 'connected' && (
+        <div className="border-b bg-white">
+          <div className="container mx-auto px-4">
+            <div className="flex gap-1">
+              <button
+                onClick={() => setActiveTab('council')}
+                className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+                  activeTab === 'council'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Council Session
+              </button>
+              <button
+                onClick={() => setActiveTab('ollama')}
+                className={`px-6 py-3 font-medium border-b-2 transition-colors ${
+                  activeTab === 'ollama'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Local Models (Ollama)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {backendStatus === 'error' ? (
@@ -69,47 +103,59 @@ function App() {
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Welcome Message (show if no session) */}
-            {sessionStatus === 'idle' && (
-              <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Welcome to HiveCouncil
-                </h2>
-                <p className="text-gray-600">
-                  Create a council of AI models to discuss your question and build consensus through iterations.
-                </p>
+          <>
+            {/* Council Tab */}
+            {activeTab === 'council' && (
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Welcome Message (show if no session) */}
+                {sessionStatus === 'idle' && (
+                  <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                      Welcome to HiveCouncil
+                    </h2>
+                    <p className="text-gray-600">
+                      Create a council of AI models to discuss your question and build consensus through iterations.
+                    </p>
+                  </div>
+                )}
+
+                {/* Prompt Input */}
+                <PromptInput />
+
+                {/* Live Session Display */}
+                <LiveSession />
+
+                {/* Info Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg shadow-sm border p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">🤖 Multi-Provider</h3>
+                    <p className="text-sm text-gray-600">
+                      OpenAI, Anthropic, Google, Grok, and Ollama work together
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">🎯 Model Selection</h3>
+                    <p className="text-sm text-gray-600">
+                      Choose specific models for each provider
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">🔄 Iterative</h3>
+                    <p className="text-sm text-gray-600">
+                      Refine consensus through multiple cycles
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Prompt Input */}
-            <PromptInput />
-
-            {/* Live Session Display */}
-            <LiveSession />
-
-            {/* Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">🤖 Multi-Provider</h3>
-                <p className="text-sm text-gray-600">
-                  OpenAI, Anthropic, Google, and Grok work together
-                </p>
+            {/* Ollama Tab */}
+            {activeTab === 'ollama' && (
+              <div className="max-w-4xl mx-auto">
+                <OllamaManager />
               </div>
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">🎯 Model Selection</h3>
-                <p className="text-sm text-gray-600">
-                  Choose specific models for each provider
-                </p>
-              </div>
-              <div className="bg-white rounded-lg shadow-sm border p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">🔄 Iterative</h3>
-                <p className="text-sm text-gray-600">
-                  Refine consensus through multiple cycles
-                </p>
-              </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </main>
 

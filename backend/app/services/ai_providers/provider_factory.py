@@ -4,6 +4,7 @@ from .openai_provider import OpenAIProvider
 from .anthropic_provider import AnthropicProvider
 from .google_provider import GoogleProvider
 from .grok_provider import GrokProvider
+from .ollama_provider import OllamaProvider
 from app.core.config import settings
 from app.core.constants import PROVIDER_CONFIGS
 
@@ -63,6 +64,11 @@ class ProviderFactory:
         if settings.grok_api_key:
             model = self._get_model_for_provider("grok")
             self._providers["grok"] = GrokProvider(settings.grok_api_key, model)
+
+        # Ollama is always available (local, no API key needed)
+        model = self._get_model_for_provider("ollama")
+        base_url = getattr(settings, "ollama_base_url", "http://localhost:11434")
+        self._providers["ollama"] = OllamaProvider("not-needed", model, base_url)
 
     def get_provider(self, name: str) -> AIProvider:
         """

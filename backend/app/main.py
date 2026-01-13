@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api.routes import session, providers, files
+from app.api.routes import session, providers, files, ollama
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.add_middleware(
 app.include_router(session.router, prefix="/api", tags=["sessions"])
 app.include_router(providers.router, prefix="/api", tags=["providers"])
 app.include_router(files.router, prefix="/api", tags=["files"])
+app.include_router(ollama.router, prefix="/api", tags=["ollama"])
 
 
 @app.get("/")
