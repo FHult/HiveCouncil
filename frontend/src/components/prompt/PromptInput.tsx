@@ -12,9 +12,7 @@ export function PromptInput() {
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>([]);
   const [iterations, setIterations] = useState(3);
   const [preset, setPreset] = useState<Preset>('balanced');
-  const [autopilot, setAutopilot] = useState(false);
   const [files, setFiles] = useState<FileAttachment[]>([]);
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const { startSession, status, error } = useSessionStore();
   const isStreaming = status === 'running';
@@ -38,7 +36,7 @@ export function PromptInput() {
       iterations,
       template: 'balanced', // Default template, chair personality drives synthesis
       preset,
-      autopilot,
+      autopilot: true, // Always run all iterations automatically
       files: files.length > 0 ? files : undefined,
     };
 
@@ -121,38 +119,6 @@ export function PromptInput() {
                 </select>
               </div>
             </div>
-
-            {/* Advanced Options Toggle */}
-            <div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                className="text-indigo-600"
-              >
-                {showAdvancedOptions ? '▼' : '▶'} Advanced Options
-              </Button>
-            </div>
-
-            {/* Advanced Options */}
-            {showAdvancedOptions && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="autopilot"
-                    checked={autopilot}
-                    onChange={(e) => setAutopilot(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    disabled={isStreaming}
-                  />
-                  <label htmlFor="autopilot" className="text-sm text-gray-700">
-                    Autopilot mode (run all iterations automatically)
-                  </label>
-                </div>
-              </div>
-            )}
 
             {/* Error Display */}
             {error && (
