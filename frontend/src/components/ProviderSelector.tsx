@@ -419,19 +419,21 @@ export default function ProviderSelector({
           width: 100%;
           margin-top: 0.75rem;
           padding: 0.5rem;
-          background: #2a2a2a;
+          background: #4a9eff;
           border: 1px solid #4a9eff;
-          color: #4a9eff;
+          color: #000;
           border-radius: 4px;
           cursor: pointer;
           font-size: 0.875rem;
-          font-weight: 500;
+          font-weight: 600;
           transition: all 0.2s ease;
         }
 
         .btn-configure:hover {
-          background: #4a9eff;
-          color: #000;
+          background: #6bb0ff;
+          border-color: #6bb0ff;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
         }
 
         .btn-chair {

@@ -154,6 +154,56 @@ export const OllamaManager: React.FC = () => {
     }
   };
 
+  const handleDownloadMLX = async (modelKey: string) => {
+    setPullStatus((prev) => ({ ...prev, [modelKey]: 'Downloading...' }));
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/ollama/mlx/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_key: modelKey }),
+      });
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.error) {
+              setPullStatus((prev) => ({ ...prev, [modelKey]: `Error: ${data.error}` }));
+              return;
+            }
+
+            if (data.status) {
+              setPullStatus((prev) => ({ ...prev, [modelKey]: data.status }));
+            }
+          }
+        }
+      }
+
+      setPullStatus((prev) => ({ ...prev, [modelKey]: 'Complete' }));
+      await fetchInstalledModels();
+    } catch (error) {
+      setPullStatus((prev) => ({
+        ...prev,
+        [modelKey]: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }));
+    }
+  };
+
   const handleDeleteModel = async (modelName: string) => {
     try {
       await fetch(`${API_BASE_URL}/ollama/models/${encodeURIComponent(modelName)}`, {
@@ -342,7 +392,7 @@ export const OllamaManager: React.FC = () => {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handlePullModel(key)}
+                    onClick={() => handleDownloadMLX(key)}
                     disabled={!!pullStatus[key]}
                   >
                     {pullStatus[key] || 'Download'}
