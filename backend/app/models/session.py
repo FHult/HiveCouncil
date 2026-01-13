@@ -37,8 +37,11 @@ class Session(Base):
     status = Column(String, default="pending", nullable=False)
 
     # Provider selection (JSON arrays)
-    selected_providers = Column(Text, nullable=True)  # JSON serialized list of selected providers
+    selected_providers = Column(Text, nullable=True)  # JSON serialized list of selected providers (legacy)
     excluded_providers = Column(Text, nullable=True)  # JSON serialized list (for iterations)
+
+    # Council members configuration (new system)
+    council_members = Column(Text, nullable=True)  # JSON serialized list of council member configs
 
     # Autopilot mode
     autopilot = Column(Boolean, default=False, nullable=False)

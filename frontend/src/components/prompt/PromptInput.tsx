@@ -6,13 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from './ModelSelector';
 import { FileUpload } from './FileUpload';
-import ProviderSelector from '@/components/ProviderSelector';
-import type { SessionConfig, Template, Preset, FileAttachment } from '@/types';
+import CouncilMemberEditor from '@/components/CouncilMemberEditor';
+import type { SessionConfig, Template, Preset, FileAttachment, CouncilMember } from '@/types';
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState('');
-  const [chair, setChair] = useState('anthropic');
-  const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
+  const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>([]);
   const [iterations, setIterations] = useState(3);
   const [template, setTemplate] = useState<Template>('balanced');
   const [preset, setPreset] = useState<Preset>('balanced');
@@ -35,20 +34,18 @@ export function PromptInput() {
       return;
     }
 
-    if (selectedProviders.length === 0) {
-      alert('Please select at least one provider');
+    if (councilMembers.length === 0) {
+      alert('Please add at least one council member');
       return;
     }
 
     const config: SessionConfig = {
       prompt: prompt.trim(),
-      chair,
-      selected_providers: selectedProviders,
+      council_members: councilMembers,
       iterations,
       template,
       preset,
       autopilot,
-      model_configs: getModelConfigs(),
       files: files.length > 0 ? files : undefined,
     };
 
@@ -86,12 +83,11 @@ export function PromptInput() {
             {/* File Upload */}
             <FileUpload files={files} onFilesChange={setFiles} disabled={isStreaming} />
 
-            {/* Provider Selection */}
-            <ProviderSelector
-              selectedProviders={selectedProviders}
-              onSelectionChange={setSelectedProviders}
-              chair={chair}
-              onChairChange={setChair}
+            {/* Council Member Configuration */}
+            <CouncilMemberEditor
+              members={councilMembers}
+              onMembersChange={setCouncilMembers}
+              providers={Object.values(providers)}
             />
 
             {/* Main Controls */}
@@ -205,7 +201,7 @@ export function PromptInput() {
             {/* Submit Button */}
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-500">
-                {configuredProviders.length} provider{configuredProviders.length !== 1 ? 's' : ''} configured
+                {councilMembers.length} council member{councilMembers.length !== 1 ? 's' : ''} configured
               </p>
               <Button type="submit" disabled={isStreaming || !prompt.trim()}>
                 {isStreaming ? (

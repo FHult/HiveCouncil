@@ -93,6 +93,7 @@ class SessionOrchestrator:
             preset=config.preset,
             autopilot=config.autopilot,
             selected_providers=selected_providers_json,
+            council_members=council_members_json,
             status="running",
         )
 
