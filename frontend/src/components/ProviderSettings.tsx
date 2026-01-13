@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import APIKeyModal from './APIKeyModal';
-import OllamaManager from './ollama/OllamaManager';
+import { OllamaManager } from './ollama/OllamaManager';
 
 interface Provider {
   name: string;

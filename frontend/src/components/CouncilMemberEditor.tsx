@@ -9,6 +9,18 @@ interface CouncilMemberEditorProps {
 
 const generateId = () => `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google Gemini',
+  grok: 'Grok',
+  ollama: 'Ollama',
+};
+
+const getProviderDisplayName = (providerName: string) => {
+  return PROVIDER_DISPLAY_NAMES[providerName] || providerName;
+};
+
 export default function CouncilMemberEditor({
   members,
   onMembersChange,
@@ -138,7 +150,7 @@ export default function CouncilMemberEditor({
                       {member.is_chair && <span className="chair-badge">★ Chair</span>}
                     </div>
                     <div className="member-subtitle">
-                      {archetypeInfo?.name || 'Balanced'} • {providerInfo?.displayName || member.provider}
+                      {archetypeInfo?.name || 'Balanced'} • {getProviderDisplayName(member.provider)}
                     </div>
                   </div>
                 </div>
@@ -193,7 +205,7 @@ export default function CouncilMemberEditor({
                     >
                       {providers.filter(p => p.configured).map((provider) => (
                         <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
+                          {getProviderDisplayName(provider.name)}
                         </option>
                       ))}
                     </select>

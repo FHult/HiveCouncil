@@ -291,9 +291,103 @@ class SessionOrchestrator:
     async def _collect_feedback(
         self, session: Session, merged_response: dict, iteration: int
     ) -> AsyncGenerator[dict, None]:
-        """Collect feedback from council on the merged response."""
+        """Collect feedback from council members on the merged response."""
         import json
 
+        # Use council members system if available
+        if hasattr(self, 'council_members') and self.council_members:
+            # Create wrapper coroutines that return member info with result
+            async def get_feedback_with_member(provider, member_id, member_role, prompt, temp, system_prompt):
+                try:
+                    result = await self._get_provider_response(provider, prompt, temp, system_prompt)
+                    model = getattr(provider, 'model', 'unknown')
+                    return member_id, member_role, model, result, None
+                except Exception as e:
+                    return member_id, member_role, None, None, e
+
+            temperature = self._get_temperature_for_session(session)
+
+            # Create tasks for all council members
+            tasks = []
+            for member in self.council_members:
+                provider = self.provider_factory.get_provider(member.provider)
+                if provider:
+                    # Get member's personality system prompt
+                    system_prompt = self.member_personalities.get(member.id)
+
+                    # Create feedback prompt
+                    feedback_prompt = f"""Please review and critique the following merged response:
+
+{merged_response['content']}
+
+Original prompt was: {session.prompt}
+
+Provide constructive feedback on:
+1. What works well
+2. What could be improved
+3. Any missing perspectives or considerations
+4. Specific suggestions for enhancement"""
+
+                    tasks.append(get_feedback_with_member(
+                        provider, member.id, member.role,
+                        feedback_prompt, temperature, system_prompt
+                    ))
+
+            # Run all members in parallel
+            for coro in asyncio.as_completed(tasks):
+                member_id, member_role, model, result, error = await coro
+
+                if error:
+                    yield {
+                        "type": "error",
+                        "member_id": member_id,
+                        "member_role": member_role,
+                        "message": f"Failed to get feedback: {str(error)}",
+                    }
+                    continue
+
+                try:
+                    content, input_tokens, output_tokens, cost = result
+
+                    # Save to database with member info
+                    response = Response(
+                        session_id=session.id,
+                        provider=member_id,  # Store member_id in provider field
+                        model=model,
+                        iteration=iteration,
+                        role="council",
+                        content=content,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        estimated_cost=cost,
+                    )
+                    self.db.add(response)
+                    await self.db.commit()
+                    await self.db.refresh(response)
+
+                    yield {
+                        "type": "feedback",
+                        "iteration": iteration,
+                        "member_id": member_id,
+                        "member_role": member_role,
+                        "content": content,
+                        "tokens": {"input": input_tokens, "output": output_tokens},
+                        "cost": cost,
+                        "done": True,
+                        "response_id": response.id,
+                    }
+
+                except Exception as e:
+                    yield {
+                        "type": "error",
+                        "member_id": member_id,
+                        "member_role": member_role,
+                        "message": f"Failed to get feedback: {str(e)}",
+                    }
+
+            return
+
+        # Legacy provider system fallback
         providers = self.provider_factory.get_all_providers()
         provider_names = self.provider_factory.get_provider_names()
 
