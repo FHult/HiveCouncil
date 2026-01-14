@@ -46,6 +46,10 @@ class SessionCreate(BaseModel):
         default=None,
         description="Optional file attachments to include with the prompt"
     )
+    resume_state: dict | None = Field(
+        default=None,
+        description="State data for resuming a paused session"
+    )
 
     # Legacy fields for backward compatibility
     chair: str | None = Field(default=None, description="[Deprecated] Use council_members instead")

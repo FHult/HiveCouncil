@@ -23,6 +23,14 @@ async def get_providers():
         available_models = PROVIDER_CONFIGS[provider_name].get("available_models", [])
         default_model = PROVIDER_CONFIGS[provider_name].get("default_model")
 
+        # For Ollama, get actually installed models
+        if provider_name == "ollama" and hasattr(provider, 'list_available_models'):
+            try:
+                available_models = await provider.list_available_models()
+            except Exception as e:
+                print(f"Error getting Ollama models: {e}")
+                available_models = []
+
         providers_info[provider_name] = {
             "name": provider_name,
             "current_model": provider.get_model_name(),

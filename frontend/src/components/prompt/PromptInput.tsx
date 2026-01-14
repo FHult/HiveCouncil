@@ -120,13 +120,6 @@ export function PromptInput() {
               </div>
             </div>
 
-            {/* Error Display */}
-            {error && (
-              <div className="rounded-md bg-red-50 border border-red-200 p-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
             {/* Submit Button */}
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-500">

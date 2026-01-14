@@ -1,5 +1,24 @@
 """Personality archetypes for council members."""
 
+# Model recommendations for each archetype (Ollama models)
+ARCHETYPE_MODEL_RECOMMENDATIONS = {
+    "balanced": ["llama3.1", "qwen2:7b"],  # Well-rounded models
+    "optimist": ["llama3.1", "gemma2"],  # Creative + general strength
+    "critic": ["mistral", "llama3.1"],  # Strong reasoning for counterarguments
+    "pragmatist": ["phi3", "qwen2:7b"],  # Efficient, practical models
+    "creative": ["gemma2", "llama3.1"],  # High creativity scores
+    "analyst": ["mistral", "qwen2:7b"],  # Strong reasoning and coding
+    "devil_advocate": ["mistral", "llama3.1"],  # Strong reasoning needed
+    "synthesizer": ["llama3.1", "gemma2"],  # Need creativity + reasoning
+    "ethicist": ["mistral", "llama3.1"],  # Strong reasoning for ethics
+    "strategist": ["llama3.1", "mistral"],  # Long-term thinking, reasoning
+    "minimalist": ["phi3", "qwen2:7b"],  # Efficient models for simplicity
+    "maximalist": ["llama3.1", "gemma2"],  # Broad thinking models
+    "technical": ["codellama", "mistral"],  # Technical specialist models
+    "user_advocate": ["gemma2", "llama3.1"],  # Empathy + general strength
+    "researcher": ["mistral", "qwen2:7b"],  # Rigorous reasoning
+}
+
 PERSONALITY_ARCHETYPES = {
     "balanced": {
         "name": "Balanced Analyst",
@@ -102,6 +121,7 @@ def get_archetype_list():
             "name": value["name"],
             "description": value["description"],
             "emoji": value["emoji"],
+            "recommended_models": ARCHETYPE_MODEL_RECOMMENDATIONS.get(key, []),
         }
         for key, value in PERSONALITY_ARCHETYPES.items()
     ]

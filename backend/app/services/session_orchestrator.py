@@ -152,7 +152,7 @@ class SessionOrchestrator:
                 # Chair merges feedback into improved response
                 yield {"type": "status", "message": f"Chair is merging iteration {iteration} feedback..."}
 
-                async for update in self._create_merge(session, feedback_responses, iteration):
+                async for update in self._create_merge(session, feedback_responses, iteration, merged_response):
                     yield update
                     if update.get("done"):
                         merged_response = update
@@ -167,6 +167,300 @@ class SessionOrchestrator:
             session.status = "failed"
             await self.db.commit()
             yield {"type": "error", "message": str(e)}
+
+    async def run_session_with_resume(self, session: Session, resume_state: dict) -> AsyncGenerator[dict, None]:
+        """
+        Resume a session from a paused state.
+
+        Args:
+            session: The session object
+            resume_state: Dictionary containing:
+                - current_iteration: Which iteration was in progress
+                - responses: List of completed responses
+                - merged_responses: List of completed merged responses
+                - total_cost: Running cost
+                - total_tokens: Running token counts
+
+        Yields status updates as the session progresses.
+        """
+        try:
+            current_iteration = resume_state.get('current_iteration', 1)
+            existing_responses = resume_state.get('responses', [])
+            existing_merged = resume_state.get('merged_responses', [])
+
+            yield {"type": "status", "message": f"Resuming from iteration {current_iteration}..."}
+
+            # Determine what phase we're in and what's missing
+            # Count responses for current iteration
+            current_iter_responses = [r for r in existing_responses if r.get('iteration') == current_iteration]
+            current_iter_merged = [r for r in existing_merged if r.get('iteration') == current_iteration]
+
+            # Get list of member IDs who have already responded in this iteration
+            responded_member_ids = {r.get('member_id') for r in current_iter_responses if r.get('member_id')}
+
+            # Get expected council members (excluding chair)
+            non_chair_members = [m for m in self.council_members if not m.is_chair]
+            expected_members = len(non_chair_members)
+
+            # Find members who haven't responded yet
+            missing_members = [m for m in non_chair_members if m.id not in responded_member_ids]
+
+            merged_response = None
+            if existing_merged:
+                merged_response = existing_merged[-1]
+
+            # Phase 1: Complete current iteration if needed
+            if current_iteration == 1:
+                # Initial responses phase
+                if missing_members:
+                    yield {"type": "status", "message": f"Requesting {len(missing_members)} missing initial response(s)..."}
+
+                    initial_responses = list(current_iter_responses)
+                    # Only collect from missing members
+                    async for update in self._collect_responses_from_members(session, missing_members, iteration=1):
+                        yield update
+                        if update.get("done"):
+                            initial_responses.append(update)
+                else:
+                    initial_responses = current_iter_responses
+
+                # Create merge if not exists
+                if not current_iter_merged:
+                    yield {"type": "status", "message": f"Chair ({session.chair_provider}) is merging responses..."}
+                    async for update in self._create_merge(session, initial_responses, iteration=1):
+                        yield update
+                        if update.get("done"):
+                            merged_response = update
+
+            else:
+                # Feedback iteration phase
+                if missing_members:
+                    yield {"type": "status", "message": f"Requesting {len(missing_members)} missing feedback response(s) for iteration {current_iteration}..."}
+
+                    feedback_responses = list(current_iter_responses)
+                    # Only collect from missing members
+                    async for update in self._collect_feedback_from_members(session, merged_response, missing_members, current_iteration):
+                        yield update
+                        if update.get("done"):
+                            feedback_responses.append(update)
+                else:
+                    feedback_responses = current_iter_responses
+
+                # Create merge if not exists
+                if not current_iter_merged:
+                    yield {"type": "status", "message": f"Chair is merging iteration {current_iteration} feedback..."}
+                    async for update in self._create_merge(session, feedback_responses, current_iteration, merged_response):
+                        yield update
+                        if update.get("done"):
+                            merged_response = update
+
+            # Phase 2: Continue with remaining iterations
+            for iteration in range(current_iteration + 1, session.total_iterations + 1):
+                yield {"type": "status", "message": f"Starting iteration {iteration}/{session.total_iterations}..."}
+
+                # Collect feedback from council on the merged response
+                feedback_responses = []
+                async for update in self._collect_feedback(session, merged_response, iteration):
+                    yield update
+                    if update.get("done"):
+                        feedback_responses.append(update)
+
+                # Chair merges feedback into improved response
+                yield {"type": "status", "message": f"Chair is merging iteration {iteration} feedback..."}
+
+                async for update in self._create_merge(session, feedback_responses, iteration, merged_response):
+                    yield update
+                    if update.get("done"):
+                        merged_response = update
+
+            # Complete
+            session.status = "completed"
+            await self.db.commit()
+
+            yield {"type": "complete", "session_id": session.id}
+
+        except Exception as e:
+            session.status = "failed"
+            await self.db.commit()
+            yield {"type": "error", "message": str(e)}
+
+    async def _collect_responses_from_members(
+        self, session: Session, members: list, iteration: int
+    ) -> AsyncGenerator[dict, None]:
+        """Collect initial responses from specific council members."""
+        if not members:
+            return
+
+        temperature = self._get_temperature_for_session(session)
+
+        # Create wrapper coroutines
+        async def get_response_with_name(provider, name, member_id, member_model, prompt, temp, system_prompt):
+            try:
+                result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
+                return name, member_model, member_id, result, None
+            except Exception as e:
+                return name, None, member_id, None, e
+
+        # Create tasks for specified members only
+        tasks = []
+        for member in members:
+            provider = self.provider_factory.get_provider(member.provider)
+            if provider:
+                system_prompt = self.member_personalities.get(member.id)
+                tasks.append(get_response_with_name(
+                    provider, member.provider, member.id, member.model,
+                    session.prompt, temperature, system_prompt
+                ))
+
+        # Run in parallel and yield results as they complete
+        for coro in asyncio.as_completed(tasks):
+            provider_name, model, member_id, result, error = await coro
+
+            if error:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "message": f"Failed to get response: {str(error)}",
+                }
+                continue
+
+            try:
+                content, input_tokens, output_tokens, cost = result
+
+                # Get member role for display
+                member_role = provider_name
+                member = next((m for m in members if m.id == member_id), None)
+                if member:
+                    member_role = member.role
+
+                # Save to database
+                response = Response(
+                    session_id=session.id,
+                    provider=provider_name,
+                    model=model,
+                    iteration=iteration,
+                    role="council",
+                    content=content,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    estimated_cost=cost,
+                )
+                self.db.add(response)
+                await self.db.commit()
+
+                yield {
+                    "type": "initial_response",
+                    "response_id": response.id,
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "member_role": member_role,
+                    "content": content,
+                    "iteration": iteration,
+                    "tokens": {"input": input_tokens, "output": output_tokens},
+                    "cost": cost,
+                    "done": True,
+                }
+            except Exception as e:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "message": f"Failed to save response: {str(e)}",
+                }
+
+    async def _collect_feedback_from_members(
+        self, session: Session, previous_output: dict, members: list, iteration: int
+    ) -> AsyncGenerator[dict, None]:
+        """Collect feedback from specific council members on previous output."""
+        if not members or not previous_output:
+            return
+
+        temperature = self._get_temperature_for_session(session)
+        prev_content = previous_output.get('content', '')
+
+        feedback_prompt = f"""Original prompt: {session.prompt}
+
+Previous output (iteration {iteration - 1}):
+{prev_content}
+
+Please provide constructive feedback on this output. What could be improved? What's working well? What's missing?"""
+
+        # Create wrapper coroutines
+        async def get_response_with_name(provider, name, member_id, member_model, prompt, temp, system_prompt):
+            try:
+                result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
+                return name, member_model, member_id, result, None
+            except Exception as e:
+                return name, None, member_id, None, e
+
+        # Create tasks for specified members only
+        tasks = []
+        for member in members:
+            provider = self.provider_factory.get_provider(member.provider)
+            if provider:
+                system_prompt = self.member_personalities.get(member.id)
+                tasks.append(get_response_with_name(
+                    provider, member.provider, member.id, member.model,
+                    feedback_prompt, temperature, system_prompt
+                ))
+
+        # Run in parallel and yield results as they complete
+        for coro in asyncio.as_completed(tasks):
+            provider_name, model, member_id, result, error = await coro
+
+            if error:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "message": f"Failed to get feedback: {str(error)}",
+                }
+                continue
+
+            try:
+                content, input_tokens, output_tokens, cost = result
+
+                # Get member role for display
+                member_role = provider_name
+                member = next((m for m in members if m.id == member_id), None)
+                if member:
+                    member_role = member.role
+
+                # Save to database
+                response = Response(
+                    session_id=session.id,
+                    provider=provider_name,
+                    model=model,
+                    iteration=iteration,
+                    role="council",
+                    content=content,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    estimated_cost=cost,
+                )
+                self.db.add(response)
+                await self.db.commit()
+
+                yield {
+                    "type": "feedback",
+                    "response_id": response.id,
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "member_role": member_role,
+                    "content": content,
+                    "iteration": iteration,
+                    "tokens": {"input": input_tokens, "output": output_tokens},
+                    "cost": cost,
+                    "done": True,
+                }
+            except Exception as e:
+                yield {
+                    "type": "error",
+                    "provider": provider_name,
+                    "member_id": member_id,
+                    "message": f"Failed to save feedback: {str(e)}",
+                }
 
     async def _collect_initial_responses(
         self, session: Session
@@ -202,11 +496,10 @@ class SessionOrchestrator:
         temperature = self._get_temperature_for_session(session)
 
         # Create wrapper coroutines that return provider name, model, and member info with result
-        async def get_response_with_name(provider, name, member_id, prompt, temp, system_prompt):
+        async def get_response_with_name(provider, name, member_id, member_model, prompt, temp, system_prompt):
             try:
-                result = await self._get_provider_response(provider, prompt, temp, system_prompt)
-                model = getattr(provider, 'model', 'unknown')
-                return name, model, member_id, result, None
+                result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
+                return name, member_model, member_id, result, None
             except Exception as e:
                 return name, None, member_id, None, e
 
@@ -219,14 +512,15 @@ class SessionOrchestrator:
                 if provider:
                     system_prompt = self.member_personalities.get(member.id)
                     tasks.append(get_response_with_name(
-                        provider, member.provider, member.id,
+                        provider, member.provider, member.id, member.model,
                         session.prompt, temperature, system_prompt
                     ))
         else:
             # Legacy provider system (backward compatibility)
             for provider, name in zip(providers, provider_names):
+                legacy_model = getattr(provider, 'model', None)
                 tasks.append(get_response_with_name(
-                    provider, name, f"legacy_{name}",
+                    provider, name, f"legacy_{name}", legacy_model,
                     session.prompt, temperature, None
                 ))
 
@@ -297,11 +591,10 @@ class SessionOrchestrator:
         # Use council members system if available
         if hasattr(self, 'council_members') and self.council_members:
             # Create wrapper coroutines that return member info with result
-            async def get_feedback_with_member(provider, member_id, member_role, prompt, temp, system_prompt):
+            async def get_feedback_with_member(provider, member_id, member_role, member_model, prompt, temp, system_prompt):
                 try:
-                    result = await self._get_provider_response(provider, prompt, temp, system_prompt)
-                    model = getattr(provider, 'model', 'unknown')
-                    return member_id, member_role, model, result, None
+                    result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
+                    return member_id, member_role, member_model, result, None
                 except Exception as e:
                     return member_id, member_role, None, None, e
 
@@ -329,7 +622,7 @@ Provide constructive feedback on:
 4. Specific suggestions for enhancement"""
 
                     tasks.append(get_feedback_with_member(
-                        provider, member.id, member.role,
+                        provider, member.id, member.role, member.model,
                         feedback_prompt, temperature, system_prompt
                     ))
 
@@ -368,6 +661,7 @@ Provide constructive feedback on:
                     yield {
                         "type": "feedback",
                         "iteration": iteration,
+                        "provider": member_id,  # Use member_id as provider for consistency
                         "member_id": member_id,
                         "member_role": member_role,
                         "content": content,
@@ -490,7 +784,7 @@ Provide constructive feedback on:
                 }
 
     async def _create_merge(
-        self, session: Session, responses: list[dict], iteration: int
+        self, session: Session, responses: list[dict], iteration: int, previous_merge: dict = None
     ) -> AsyncGenerator[dict, None]:
         """Chair creates a merged response from all inputs."""
         chair_provider = self.provider_factory.get_provider(session.chair_provider)
@@ -502,12 +796,18 @@ Provide constructive feedback on:
             }
             return
 
-        # Get chair's personality system prompt if using council members
+        # Get chair's personality system prompt, model, and role if using council members
         chair_system_prompt = None
+        chair_member_id = None
+        chair_member_role = None
+        chair_model = None
         if hasattr(self, 'council_members') and self.council_members:
             chair_member = next((m for m in self.council_members if m.is_chair), None)
             if chair_member:
                 chair_system_prompt = self.member_personalities.get(chair_member.id)
+                chair_member_id = chair_member.id
+                chair_member_role = chair_member.role
+                chair_model = chair_member.model
 
         # Build merge prompt
         responses_text = "\n\n".join([
@@ -516,38 +816,57 @@ Provide constructive feedback on:
         ])
 
         if iteration == 1:
-            merge_prompt = f"""As the chair of this council, your task is to synthesize the following responses into a comprehensive, cohesive answer.
+            merge_prompt = f"""As the chair of this council, synthesize these council member responses into a single, concrete deliverable.
 
 Original prompt: {session.prompt}
 
-Council responses to merge:
+Council responses:
 {responses_text}
 
-Please create a well-integrated merged response that represents the collective wisdom of the council."""
+Your task:
+- If the original prompt contains content to be improved or revised (e.g., "improve this blog post: [content]"), create an IMPROVED VERSION of that specific content based on the council's feedback and suggestions. The council has reviewed the original content - now produce the enhanced version.
+- If the prompt is an instruction or question without existing content, create the actual output requested (new content, answer, or analysis).
+
+This should be a complete, ready-to-use result that incorporates the collective wisdom of the council - not just a summary of their opinions."""
         else:
-            # For iteration cycles
-            merge_prompt = f"""As the chair, review the feedback from your council members and create an improved merged response.
+            # For iteration cycles - use the previous merged output
+            prev_content = previous_merge.get('content', 'No previous version available') if previous_merge else "No previous version available"
+
+            merge_prompt = f"""As the chair, you must now produce the ACTUAL IMPROVED VERSION of the deliverable, incorporating the council's feedback.
 
 Original prompt: {session.prompt}
+
+Previous version (iteration {iteration - 1}):
+{prev_content}
 
 Council feedback:
 {responses_text}
 
-Please create an enhanced merged response that incorporates this feedback."""
+CRITICAL INSTRUCTIONS:
+- DO NOT provide commentary, analysis, or suggestions
+- DO NOT write "Title Revision Suggestion:" or similar meta-text
+- DO NOT explain what changes you're making
+- PRODUCE THE ACTUAL IMPROVED DELIVERABLE that directly fulfills the original prompt
+- If it's an essay, write the full improved essay
+- If it's code, write the full improved code
+- If it's an analysis, write the full improved analysis
+
+Begin your response with the actual deliverable content immediately."""
 
         # Get chair's merged response with their personality
         temperature = self._get_temperature_for_session(session)
 
         try:
             content, input_tokens, output_tokens, cost = await self._get_provider_response(
-                chair_provider, merge_prompt, temperature, chair_system_prompt
+                chair_provider, merge_prompt, temperature, chair_system_prompt, model=chair_model
             )
 
-            # Save to database
+            # Save to database (use chair_model if available, otherwise get from provider)
+            model_to_save = chair_model if chair_model else getattr(chair_provider, 'model', 'unknown')
             response = Response(
                 session_id=session.id,
                 provider=session.chair_provider,
-                model=getattr(chair_provider, 'model', 'unknown'),
+                model=model_to_save,
                 iteration=iteration,
                 role="chair",
                 content=content,
@@ -563,6 +882,8 @@ Please create an enhanced merged response that incorporates this feedback."""
                 "type": "merge",
                 "iteration": iteration,
                 "provider": session.chair_provider,
+                "member_id": chair_member_id,
+                "member_role": chair_member_role,
                 "content": content,
                 "tokens": {"input": input_tokens, "output": output_tokens},
                 "cost": cost,
@@ -577,7 +898,7 @@ Please create an enhanced merged response that incorporates this feedback."""
             }
 
     async def _get_provider_response(
-        self, provider, prompt: str, temperature: float, system_prompt: str | None = None
+        self, provider, prompt: str, temperature: float, system_prompt: str | None = None, model: str | None = None
     ) -> tuple[str, int, int, float]:
         """
         Get a complete response from a provider.
@@ -587,6 +908,7 @@ Please create an enhanced merged response that incorporates this feedback."""
             prompt: The user prompt
             temperature: Temperature for generation
             system_prompt: Optional system prompt (personality/role instructions)
+            model: Optional specific model to use (overrides provider's default)
 
         Returns: (content, input_tokens, output_tokens, cost)
         """
@@ -597,24 +919,35 @@ Please create an enhanced merged response that incorporates this feedback."""
 
         content = ""
 
-        # Determine if we should send image data
-        image_to_send = None
-        if self.image_data and hasattr(provider, 'supports_vision') and provider.supports_vision():
-            image_to_send = self.image_data
+        # Temporarily set model if specified (for supporting multiple models per provider)
+        original_model = None
+        if model:
+            original_model = provider.model
+            provider.model = model
 
-        # Collect streamed response with personality system prompt
-        async for chunk in provider.stream_completion(
-            prompt=full_prompt,
-            system_prompt=system_prompt,
-            temperature=temperature,
-            max_tokens=4000,
-            image_data=image_to_send,
-        ):
-            content += chunk
+        try:
+            # Determine if we should send image data
+            image_to_send = None
+            if self.image_data and hasattr(provider, 'supports_vision') and provider.supports_vision():
+                image_to_send = self.image_data
 
-        # Count tokens and estimate cost
-        input_tokens = provider.count_tokens(full_prompt)
-        output_tokens = provider.count_tokens(content)
-        cost = provider.estimate_cost(input_tokens, output_tokens)
+            # Collect streamed response with personality system prompt
+            async for chunk in provider.stream_completion(
+                prompt=full_prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=4000,
+                image_data=image_to_send,
+            ):
+                content += chunk
 
-        return content, input_tokens, output_tokens, cost
+            # Count tokens and estimate cost
+            input_tokens = provider.count_tokens(full_prompt)
+            output_tokens = provider.count_tokens(content)
+            cost = provider.estimate_cost(input_tokens, output_tokens)
+
+            return content, input_tokens, output_tokens, cost
+        finally:
+            # Restore original model if we changed it
+            if original_model is not None:
+                provider.model = original_model

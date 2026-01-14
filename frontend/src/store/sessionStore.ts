@@ -7,8 +7,14 @@ import type { SessionConfig, StreamEvent, CouncilResponse, SessionState as Sessi
 interface SessionStore extends SessionStateType {
   // Actions
   startSession: (config: SessionConfig) => Promise<void>;
+  resumeSession: () => Promise<void>;
+  pauseSession: () => void;
   clearSession: () => void;
   handleStreamEvent: (event: StreamEvent) => void;
+  // Internal state
+  _reader: ReadableStreamDefaultReader<Uint8Array> | null;
+  _sessionConfig: SessionConfig | null;
+  isPaused: boolean;
 }
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -24,9 +30,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   totalCost: 0,
   totalTokens: { input: 0, output: 0 },
   error: undefined,
+  _reader: null,
+  _sessionConfig: null,
+  isPaused: false,
 
   startSession: async (config: SessionConfig) => {
-    // Reset state
+    // Reset state and store config for potential resume
     set({
       sessionId: null,
       status: 'running',
@@ -38,6 +47,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       totalCost: 0,
       totalTokens: { input: 0, output: 0 },
       error: undefined,
+      isPaused: false,
+      _sessionConfig: config,
     });
 
     try {
@@ -60,6 +71,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (!reader) {
         throw new Error('No response body');
       }
+
+      // Store reader for potential cancellation
+      set({ _reader: reader });
 
       // Read the stream
       while (true) {
@@ -87,11 +101,136 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
       }
     } catch (error) {
+      // Check if this was a manual pause
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Don't change status if paused - keep the session data visible
+        const currentState = get();
+        if (!currentState.isPaused) {
+          set({
+            status: 'error',
+            statusMessage: 'Session interrupted',
+            _reader: null,
+          });
+        }
+      } else {
+        set({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Failed to create session',
+          statusMessage: 'Session failed',
+          _reader: null,
+        });
+      }
+    }
+  },
+
+  pauseSession: () => {
+    const { _reader, status } = get();
+
+    if (status === 'running' && _reader) {
+      _reader.cancel();
       set({
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Failed to create session',
-        statusMessage: 'Session failed',
+        isPaused: true,
+        statusMessage: 'Session paused - you can resume to continue',
+        _reader: null,
       });
+    }
+  },
+
+  resumeSession: async () => {
+    const state = get();
+
+    if (!state.isPaused || !state._sessionConfig) {
+      console.error('Cannot resume: session not paused or config missing');
+      return;
+    }
+
+    // Resume with current state by creating a modified config
+    const resumeConfig: SessionConfig & { resume_state?: any } = {
+      ...state._sessionConfig,
+      resume_state: {
+        current_iteration: state.currentIteration,
+        responses: state.responses,
+        merged_responses: state.mergedResponses,
+        total_cost: state.totalCost,
+        total_tokens: state.totalTokens,
+      }
+    };
+
+    set({
+      status: 'running',
+      isPaused: false,
+      statusMessage: 'Resuming session...',
+    });
+
+    try {
+      // Create SSE connection with resume data
+      const response = await fetch(`${API_BASE_URL}/session/resume`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(resumeConfig),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      // Store reader for potential cancellation
+      set({ _reader: reader });
+
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode the chunk
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        // Process each line
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const event: StreamEvent = JSON.parse(data);
+              get().handleStreamEvent(event);
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Check if this was a manual pause
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Don't change status if paused - keep the session data visible
+        const currentState = get();
+        if (!currentState.isPaused) {
+          set({
+            status: 'error',
+            statusMessage: 'Session interrupted',
+            _reader: null,
+          });
+        }
+      } else {
+        set({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Failed to resume session',
+          statusMessage: 'Resume failed',
+          _reader: null,
+        });
+      }
     }
   },
 
@@ -122,6 +261,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             type: 'initial_response',
             tokens: event.tokens || { input: 0, output: 0 },
             cost: event.cost || 0,
+            member_id: event.member_id,
+            member_role: event.member_role,
           };
 
           set({
@@ -131,7 +272,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               input: state.totalTokens.input + (event.tokens?.input || 0),
               output: state.totalTokens.output + (event.tokens?.output || 0),
             },
-            statusMessage: `Received response from ${event.provider}`,
+            statusMessage: `Received response from ${event.member_role || event.provider}`,
           });
         }
         break;
@@ -146,6 +287,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             type: 'merge',
             tokens: event.tokens || { input: 0, output: 0 },
             cost: event.cost || 0,
+            member_id: event.member_id,
+            member_role: event.member_role,
           };
 
           set({
@@ -155,7 +298,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               input: state.totalTokens.input + (event.tokens?.input || 0),
               output: state.totalTokens.output + (event.tokens?.output || 0),
             },
-            statusMessage: `Chair merged responses for iteration ${event.iteration}`,
+            statusMessage: `${event.member_role || 'Chair'} merged responses for iteration ${event.iteration}`,
             currentIteration: event.iteration || 1,
           });
         }
@@ -171,7 +314,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             type: 'feedback',
             tokens: event.tokens || { input: 0, output: 0 },
             cost: event.cost || 0,
+            member_id: event.member_id,
+            member_role: event.member_role,
           };
+
+          // Update currentIteration if this feedback is for a new iteration
+          const newIteration = event.iteration || 1;
+          const shouldUpdateIteration = newIteration > state.currentIteration;
 
           set({
             responses: [...state.responses, feedbackResponse],
@@ -180,7 +329,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               input: state.totalTokens.input + (event.tokens?.input || 0),
               output: state.totalTokens.output + (event.tokens?.output || 0),
             },
-            statusMessage: `Received feedback from ${event.provider} for iteration ${event.iteration}`,
+            statusMessage: `Received feedback from ${event.member_role || event.provider} for iteration ${event.iteration}`,
+            ...(shouldUpdateIteration && { currentIteration: newIteration }),
           });
         }
         break;
@@ -203,6 +353,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   clearSession: () => {
+    const { _reader } = get();
+
+    // Cancel any active stream
+    if (_reader) {
+      _reader.cancel();
+    }
+
     set({
       sessionId: null,
       status: 'idle',
@@ -214,6 +371,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       totalCost: 0,
       totalTokens: { input: 0, output: 0 },
       error: undefined,
+      _reader: null,
+      _sessionConfig: null,
+      isPaused: false,
     });
   },
 }));

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import APIKeyModal from './APIKeyModal';
 import { OllamaManager } from './ollama/OllamaManager';
+import { useProvidersStore } from '@/store/providersStore';
 
 interface Provider {
   name: string;
@@ -8,6 +9,39 @@ interface Provider {
   displayName: string;
   default_model: string;
   available_models: string[];
+}
+
+interface RAMStatus {
+  total_gb: number;
+  available_gb: number;
+  used_gb: number;
+  used_percent: number;
+  status: 'healthy' | 'warning' | 'critical';
+  message: string;
+  recommended_models: Array<{
+    name: string;
+    ram_required: number;
+    can_run: boolean;
+    message: string;
+    suitability?: {
+      general: number;
+      coding: number;
+      reasoning: number;
+      creative: number;
+    };
+  }>;
+  all_models: Array<{
+    name: string;
+    ram_required: number;
+    can_run: boolean;
+    message: string;
+    suitability?: {
+      general: number;
+      coding: number;
+      reasoning: number;
+      creative: number;
+    };
+  }>;
 }
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -39,10 +73,29 @@ export default function ProviderSettings() {
   const [loading, setLoading] = useState(true);
   const [configureProvider, setConfigureProvider] = useState<string | null>(null);
   const [showOllamaManager, setShowOllamaManager] = useState(false);
+  const [ramStatus, setRamStatus] = useState<RAMStatus | null>(null);
+  const [ramLoading, setRamLoading] = useState(false);
+  const { loadProviders } = useProvidersStore();
 
   useEffect(() => {
     fetchProviders();
+    fetchRAMStatus();
   }, []);
+
+  const fetchRAMStatus = async () => {
+    setRamLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/system/ram-status');
+      if (response.ok) {
+        const data = await response.json();
+        setRamStatus(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch RAM status:', error);
+    } finally {
+      setRamLoading(false);
+    }
+  };
 
   const fetchProviders = async () => {
     try {
@@ -66,6 +119,12 @@ export default function ProviderSettings() {
     }
   };
 
+  const handleModelChange = async () => {
+    // Refresh both local state and global store when Ollama models change
+    await fetchProviders();
+    await loadProviders();
+  };
+
   if (loading) {
     return (
       <div className="provider-settings">
@@ -80,6 +139,61 @@ export default function ProviderSettings() {
         <h2>Provider Settings</h2>
         <p className="subtitle">Manage API keys and provider configurations</p>
       </div>
+
+      {/* RAM Status Display */}
+      {ramStatus && (
+        <div className={`ram-status-card ${ramStatus.status}`}>
+          <div className="ram-status-header">
+            <h3>🧠 System RAM Status</h3>
+            <button
+              onClick={fetchRAMStatus}
+              className="btn-refresh"
+              disabled={ramLoading}
+            >
+              {ramLoading ? '⚙️' : '🔄'} Refresh
+            </button>
+          </div>
+
+          <div className="ram-status-content">
+            <div className="ram-info">
+              <div className="ram-progress-container">
+                <div className="ram-progress-bar">
+                  <div
+                    className={`ram-progress-fill ${ramStatus.status}`}
+                    style={{ width: `${ramStatus.used_percent}%` }}
+                  />
+                </div>
+                <div className="ram-stats">
+                  <span>Used: {ramStatus.used_gb.toFixed(1)}GB ({ramStatus.used_percent}%)</span>
+                  <span>Available: {ramStatus.available_gb.toFixed(1)}GB</span>
+                  <span>Total: {ramStatus.total_gb.toFixed(1)}GB</span>
+                </div>
+              </div>
+
+              <div className={`ram-message ${ramStatus.status}`}>
+                {ramStatus.status === 'healthy' && '✓ '}
+                {ramStatus.status === 'warning' && '⚠ '}
+                {ramStatus.status === 'critical' && '⚠️ '}
+                {ramStatus.message}
+              </div>
+            </div>
+
+            {ramStatus.recommended_models.length > 0 && (
+              <div className="recommended-models">
+                <h4>Recommended Local Models ({ramStatus.recommended_models.length} can run)</h4>
+                <div className="models-list">
+                  {ramStatus.recommended_models.slice(0, 6).map((model) => (
+                    <div key={model.name} className="model-chip">
+                      <span className="model-name">{model.name}</span>
+                      <span className="model-ram">{model.ram_required}GB</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="providers-grid">
         {providers.map((provider) => (
@@ -209,7 +323,7 @@ export default function ProviderSettings() {
               </button>
             </div>
             <div className="modal-body">
-              <OllamaManager />
+              <OllamaManager onModelChange={handleModelChange} />
             </div>
           </div>
         </div>
@@ -236,6 +350,181 @@ export default function ProviderSettings() {
           margin: 0;
           color: #999;
           font-size: 1rem;
+        }
+
+        /* RAM Status Card */
+        .ram-status-card {
+          background: #1e1e1e;
+          border: 2px solid #333;
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin-bottom: 2rem;
+          transition: all 0.2s;
+        }
+
+        .ram-status-card.healthy {
+          border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .ram-status-card.warning {
+          border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .ram-status-card.critical {
+          border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .ram-status-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+
+        .ram-status-header h3 {
+          margin: 0;
+          font-size: 1.25rem;
+          color: #e0e0e0;
+        }
+
+        .btn-refresh {
+          padding: 0.5rem 1rem;
+          background: #333;
+          border: 1px solid #4a9eff;
+          color: #4a9eff;
+          border-radius: 6px;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-refresh:hover:not(:disabled) {
+          background: rgba(74, 158, 255, 0.1);
+          border-color: #6bb0ff;
+        }
+
+        .btn-refresh:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .ram-status-content {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+
+        .ram-info {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .ram-progress-container {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .ram-progress-bar {
+          width: 100%;
+          height: 24px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .ram-progress-fill {
+          height: 100%;
+          transition: width 0.3s ease;
+          border-radius: 12px;
+        }
+
+        .ram-progress-fill.healthy {
+          background: linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(34, 197, 94, 0.8));
+        }
+
+        .ram-progress-fill.warning {
+          background: linear-gradient(90deg, rgba(251, 191, 36, 0.6), rgba(251, 191, 36, 0.8));
+        }
+
+        .ram-progress-fill.critical {
+          background: linear-gradient(90deg, rgba(239, 68, 68, 0.6), rgba(239, 68, 68, 0.8));
+        }
+
+        .ram-stats {
+          display: flex;
+          justify-content: space-between;
+          color: #999;
+          font-size: 0.875rem;
+        }
+
+        .ram-message {
+          padding: 0.75rem 1rem;
+          border-radius: 6px;
+          font-size: 0.875rem;
+          font-weight: 500;
+        }
+
+        .ram-message.healthy {
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.3);
+          color: #22c55e;
+        }
+
+        .ram-message.warning {
+          background: rgba(251, 191, 36, 0.1);
+          border: 1px solid rgba(251, 191, 36, 0.3);
+          color: #fbbf24;
+        }
+
+        .ram-message.critical {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #ef4444;
+        }
+
+        .recommended-models {
+          padding: 1rem;
+          background: rgba(74, 158, 255, 0.05);
+          border-radius: 8px;
+          border: 1px solid rgba(74, 158, 255, 0.2);
+        }
+
+        .recommended-models h4 {
+          margin: 0 0 0.75rem 0;
+          font-size: 0.875rem;
+          color: #4a9eff;
+          font-weight: 600;
+        }
+
+        .models-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .model-chip {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.375rem 0.75rem;
+          background: rgba(74, 158, 255, 0.1);
+          border: 1px solid rgba(74, 158, 255, 0.3);
+          border-radius: 16px;
+          font-size: 0.8125rem;
+        }
+
+        .model-name {
+          color: #e0e0e0;
+          font-weight: 500;
+        }
+
+        .model-ram {
+          color: #4a9eff;
+          font-size: 0.75rem;
+          font-weight: 600;
         }
 
         .providers-grid {

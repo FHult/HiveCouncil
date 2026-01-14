@@ -114,6 +114,8 @@ export interface StreamEvent {
   cost?: number;
   done?: boolean;
   response_id?: number;
+  member_id?: string;
+  member_role?: string;
 }
 
 export interface CouncilResponse {
@@ -127,6 +129,8 @@ export interface CouncilResponse {
     output: number;
   };
   cost: number;
+  member_id?: string;
+  member_role?: string;
 }
 
 export interface SessionState {

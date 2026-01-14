@@ -27,7 +27,10 @@ const providerNames: Record<string, string> = {
 
 export const ResponseCard: React.FC<ResponseCardProps> = ({ response, isMerged = false }) => {
   const colorClass = providerColors[response.provider] || 'bg-gray-100 text-gray-800 border-gray-300';
-  const displayName = providerNames[response.provider] || response.provider;
+  const providerDisplayName = providerNames[response.provider] || response.provider;
+
+  // Use member_role if available, otherwise fall back to provider name
+  const displayName = response.member_role || providerDisplayName;
 
   return (
     <Card className={`p-4 ${isMerged ? 'border-2 border-primary bg-primary/5' : 'border'}`}>

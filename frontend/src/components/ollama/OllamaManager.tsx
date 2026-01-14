@@ -33,7 +33,11 @@ interface ModelInfo {
   installed?: boolean;
 }
 
-export const OllamaManager: React.FC = () => {
+interface OllamaManagerProps {
+  onModelChange?: () => void;
+}
+
+export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) => {
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [installedModels, setInstalledModels] = useState<ModelInfo[]>([]);
   const [recommendedModels, setRecommendedModels] = useState<ModelInfo[]>([]);
@@ -128,6 +132,8 @@ export const OllamaManager: React.FC = () => {
 
       setPullStatus((prev) => ({ ...prev, [modelName]: 'Complete' }));
       await fetchInstalledModels();
+      // Notify parent that models have changed
+      onModelChange?.();
     } catch (error) {
       setPullStatus((prev) => ({
         ...prev,
@@ -143,6 +149,8 @@ export const OllamaManager: React.FC = () => {
         method: 'DELETE',
       });
       await fetchInstalledModels();
+      // Notify parent that models have changed
+      onModelChange?.();
     } catch (error) {
       console.error('Failed to delete model:', error);
     }

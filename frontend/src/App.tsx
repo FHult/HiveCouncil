@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
+import { useProvidersStore } from '@/store/providersStore';
 import { sessionApi } from '@/lib/api';
 import { PromptInput } from '@/components/prompt/PromptInput';
 import { LiveSession } from '@/components/session/LiveSession';
@@ -11,8 +12,9 @@ function App() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [activeTab, setActiveTab] = useState<TabType>('council');
   const { status: sessionStatus } = useSessionStore();
+  const { loadProviders } = useProvidersStore();
 
-  // Test backend connection on mount
+  // Test backend connection and load providers on mount
   useEffect(() => {
     const testBackend = async () => {
       try {
@@ -24,7 +26,8 @@ function App() {
     };
 
     testBackend();
-  }, []);
+    loadProviders();
+  }, [loadProviders]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -33,8 +36,8 @@ function App() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">HiveCouncil</h1>
-              <p className="text-sm text-gray-600">Multi-AI Consensus Building</p>
+              <h1 className="text-2xl font-bold text-gray-900">LLMings</h1>
+              <p className="text-sm text-gray-600">Create a council of AI models to discuss your question and build consensus through iterations</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 text-sm">
@@ -59,7 +62,11 @@ function App() {
           <div className="container mx-auto px-4">
             <div className="flex gap-1">
               <button
-                onClick={() => setActiveTab('council')}
+                onClick={() => {
+                  setActiveTab('council');
+                  // Refresh providers when switching to council tab to pick up any Ollama model changes
+                  loadProviders();
+                }}
                 className={`px-6 py-3 font-medium border-b-2 transition-colors ${
                   activeTab === 'council'
                     ? 'border-indigo-600 text-indigo-600'
@@ -107,24 +114,6 @@ function App() {
             {/* Council Tab */}
             {activeTab === 'council' && (
               <div className="max-w-4xl mx-auto space-y-6">
-                {/* Welcome Message (show if no session) */}
-                {sessionStatus === 'idle' && (
-                  <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                      Welcome to HiveCouncil
-                    </h2>
-                    <p className="text-gray-600">
-                      Create a council of AI models to discuss your question and build consensus through iterations.
-                    </p>
-                  </div>
-                )}
-
-                {/* Prompt Input */}
-                <PromptInput />
-
-                {/* Live Session Display */}
-                <LiveSession />
-
                 {/* Info Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -146,6 +135,12 @@ function App() {
                     </p>
                   </div>
                 </div>
+
+                {/* Prompt Input */}
+                <PromptInput />
+
+                {/* Live Session Display */}
+                <LiveSession />
               </div>
             )}
 
@@ -162,7 +157,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t bg-white/80 backdrop-blur-sm mt-12">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-gray-600">
-          <p>HiveCouncil - Built with React, FastAPI, and AI</p>
+          <p>LLMings - Built with React, FastAPI, and AI</p>
           <p className="mt-1">
             <a
               href="https://github.com/FHult/HiveCouncil"
