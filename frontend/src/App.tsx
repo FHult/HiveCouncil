@@ -187,7 +187,7 @@ function App() {
           <p>LLMings - Built with React, FastAPI, and AI</p>
           <p className="mt-1">
             <a
-              href="https://github.com/FHult/HiveCouncil"
+              href="https://github.com/FHult/LLMings"
               target="_blank"
               rel="noopener noreferrer"
               className="text-indigo-600 hover:text-indigo-700"

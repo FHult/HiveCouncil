@@ -142,6 +142,6 @@ Once you've verified everything works:
 ## Support
 
 - Documentation: See `docs/` folder
-- Issues: https://github.com/FHult/HiveCouncil/issues
+- Issues: https://github.com/FHult/LLMings/issues
 - Architecture: See `ARCHITECTURE.md`
 - Model Selection: See `docs/MODEL_SELECTION.md`

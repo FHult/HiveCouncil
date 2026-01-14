@@ -317,4 +317,4 @@ As providers release new models:
 
 **Last Updated**: 2026-01-09
 **Status**: ✅ Implemented
-**GitHub**: https://github.com/FHult/HiveCouncil
+**GitHub**: https://github.com/FHult/LLMings

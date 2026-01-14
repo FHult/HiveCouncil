@@ -87,12 +87,12 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="text-center text-sm text-gray-500">
                 <p>If this problem persists, please report it on GitHub:</p>
                 <a
-                  href="https://github.com/FHult/HiveCouncil/issues"
+                  href="https://github.com/FHult/LLMings/issues"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-indigo-600 hover:text-indigo-700 underline"
                 >
-                  github.com/FHult/HiveCouncil/issues
+                  github.com/FHult/LLMings/issues
                 </a>
               </div>
             </div>

@@ -68,7 +68,7 @@ Phase 1 establishes the core infrastructure for HiveCouncil with a working backe
 #### Project Infrastructure
 - **Git Repository**
   - Initialized with proper .gitignore
-  - Pushed to GitHub: https://github.com/FHult/HiveCouncil
+  - Pushed to GitHub: https://github.com/FHult/LLMings
   - Two commits with detailed history
 
 - **Scripts & Automation**
@@ -166,7 +166,7 @@ The next phase will add the remaining AI providers:
 
 1. **Clone and Setup**
    ```bash
-   git clone https://github.com/FHult/HiveCouncil.git
+   git clone https://github.com/FHult/LLMings.git
    cd HiveCouncil
    ./scripts/setup.sh
    ```
@@ -216,5 +216,5 @@ The next phase will add the remaining AI providers:
 
 **Status**: Phase 1 Complete ✅
 **Next**: Phase 2 - Multi-Provider Integration
-**GitHub**: https://github.com/FHult/HiveCouncil
+**GitHub**: https://github.com/FHult/LLMings
 **Last Updated**: 2026-01-09

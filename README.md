@@ -52,8 +52,8 @@ A local web application that creates a "council" of AI models to respond to user
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/FHult/HiveCouncil.git
-   cd HiveCouncil
+   git clone https://github.com/FHult/LLMings.git
+   cd LLMings
    ```
 
 2. **Run the setup script**
@@ -80,8 +80,8 @@ A local web application that creates a "council" of AI models to respond to user
 
 1. **Clone and setup backend**
    ```bash
-   git clone https://github.com/FHult/HiveCouncil.git
-   cd HiveCouncil/backend
+   git clone https://github.com/FHult/LLMings.git
+   cd LLMings/backend
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
@@ -215,7 +215,7 @@ alembic upgrade head
 ## Project Structure
 
 ```
-HiveCouncil/
+LLMings/
 ├── frontend/          # React frontend
 │   ├── src/
 │   │   ├── components/  # React components

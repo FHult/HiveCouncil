@@ -58,8 +58,8 @@ For users who want to get started quickly:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/FHult/HiveCouncil.git
-   cd HiveCouncil
+   git clone https://github.com/FHult/LLMings.git
+   cd LLMings
    ```
 
 2. **Run the setup script**
@@ -87,8 +87,8 @@ For users who want to get started quickly:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/FHult/HiveCouncil.git
-cd HiveCouncil
+git clone https://github.com/FHult/LLMings.git
+cd LLMings
 ```
 
 ### Step 2: Backend Setup
@@ -338,7 +338,7 @@ After successful installation:
 
 - Check the [README.md](README.md) for usage documentation
 - Look at [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
-- Open an issue on [GitHub](https://github.com/FHult/HiveCouncil/issues)
+- Open an issue on [GitHub](https://github.com/FHult/LLMings/issues)
 
 ## Uninstalling
 
@@ -349,7 +349,7 @@ To remove LLMings:
 
 # Remove the directory
 cd ..
-rm -rf HiveCouncil
+rm -rf LLMings
 
 # Optional: Uninstall Ollama
 # macOS/Linux: Remove /usr/local/bin/ollama and ~/.ollama

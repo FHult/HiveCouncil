@@ -1,7 +1,7 @@
 {
-  "name": "hivecouncil",
+  "name": "llmings",
   "version": "0.1.0",
-  "description": "Multi-AI council with consensus building",
+  "description": "LLMings - Multi-AI council with consensus building",
   "scripts": {
     "setup": "npm run setup:backend && npm run setup:frontend",
     "setup:backend": "cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt",
