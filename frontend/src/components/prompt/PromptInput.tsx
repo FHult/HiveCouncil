@@ -5,7 +5,7 @@ import { useProvidersStore } from '@/store/providersStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUpload } from './FileUpload';
-import CouncilMemberEditor from '@/components/CouncilMemberEditor';
+import CouncilMemberEditor from '@/components/council';
 import { VALIDATION } from '@/lib/config';
 import type { SessionConfig, Preset, FileAttachment, CouncilMember } from '@/types';
 
