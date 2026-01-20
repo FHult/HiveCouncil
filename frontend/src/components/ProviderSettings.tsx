@@ -65,6 +65,18 @@ export default function ProviderSettings() {
     fetchRAMStatus();
   }, []);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showOllamaManager) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showOllamaManager]);
+
   const fetchRAMStatus = async () => {
     setRamLoading(true);
     try {
@@ -740,6 +752,7 @@ export default function ProviderSettings() {
           justify-content: center;
           z-index: 1000;
           padding: 1rem;
+          overflow: hidden;
         }
 
         .modal-content {
@@ -747,28 +760,31 @@ export default function ProviderSettings() {
           border-radius: 12px;
           max-width: 900px;
           width: 100%;
-          max-height: 90vh;
+          max-height: 85vh;
           overflow: hidden;
           display: flex;
           flex-direction: column;
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          border: 1px solid #333;
         }
 
         .modal-content.ollama-modal {
-          max-width: 1000px;
+          max-width: 800px;
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1.5rem 2rem;
-          border-bottom: 2px solid #333;
+          padding: 1.25rem 1.5rem;
+          border-bottom: 1px solid #333;
+          background: #1e1e1e;
+          flex-shrink: 0;
         }
 
         .modal-header h2 {
           margin: 0;
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           color: #e0e0e0;
         }
 
@@ -776,7 +792,7 @@ export default function ProviderSettings() {
           background: none;
           border: none;
           color: #999;
-          font-size: 2rem;
+          font-size: 1.75rem;
           line-height: 1;
           cursor: pointer;
           padding: 0;
@@ -796,8 +812,29 @@ export default function ProviderSettings() {
 
         .modal-body {
           overflow-y: auto;
-          padding: 0;
+          overscroll-behavior: contain;
+          padding: 1.5rem;
           flex: 1;
+          min-height: 0;
+        }
+
+        /* Scrollbar styling for modal */
+        .modal-body::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+          background: #1a1a1a;
+          border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+          background: #444;
+          border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+          background: #555;
         }
       `}</style>
     </div>
