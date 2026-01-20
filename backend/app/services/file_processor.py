@@ -5,7 +5,7 @@ File processing service for extracting text and handling various file formats.
 import base64
 import io
 from pathlib import Path
-import PyPDF2
+from pypdf import PdfReader
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
@@ -120,7 +120,7 @@ class FileProcessor:
         """Extract text from PDF."""
         try:
             pdf_file = io.BytesIO(file_content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            pdf_reader = PdfReader(pdf_file)
 
             text_parts = []
             for page_num, page in enumerate(pdf_reader.pages, 1):
