@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.services.ai_providers.ollama_provider import OllamaProvider
 from app.services.mlx_model_manager import MLXModelManager
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -173,7 +174,7 @@ async def delete_model(model_name: str):
     async with httpx.AsyncClient() as client:
         try:
             response = await client.delete(
-                f"http://localhost:11434/api/delete",
+                f"{settings.ollama_base_url}/api/delete",
                 json={"name": model_name}
             )
             response.raise_for_status()

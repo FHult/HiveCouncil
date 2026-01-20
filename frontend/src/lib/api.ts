@@ -1,13 +1,11 @@
 /**
- * API client for HiveCouncil backend
+ * API client for LLMings backend
  */
 import axios from 'axios';
 import type {
   ProvidersResponse,
   SessionConfig,
   SessionResponse,
-  Session,
-  Response as AIResponse,
 } from '@/types';
 
 const API_BASE_URL = '/api';

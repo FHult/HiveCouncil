@@ -5,12 +5,12 @@ File processing service for extracting text and handling various file formats.
 import base64
 import io
 from pathlib import Path
-from typing import Optional, Tuple
 import PyPDF2
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
 from PIL import Image
+
 
 class FileProcessor:
     """Process various file types for AI consumption."""
@@ -44,7 +44,7 @@ class FileProcessor:
         return ext in cls.IMAGE_EXTENSIONS
 
     @classmethod
-    async def process_file(cls, file_content: bytes, filename: str) -> Tuple[str, Optional[str]]:
+    def process_file(cls, file_content: bytes, filename: str) -> tuple[str, str | None]:
         """
         Process a file and extract text content.
 
@@ -57,19 +57,19 @@ class FileProcessor:
 
         # Handle images
         if ext in cls.IMAGE_EXTENSIONS:
-            return await cls._process_image(file_content, ext)
+            return cls._process_image(file_content, ext)
 
         # Handle PDFs
         if ext == '.pdf':
-            return await cls._process_pdf(file_content), None
+            return cls._process_pdf(file_content), None
 
         # Handle Word documents
         if ext == '.docx':
-            return await cls._process_docx(file_content), None
+            return cls._process_docx(file_content), None
 
         # Handle Excel files
         if ext == '.xlsx':
-            return await cls._process_xlsx(file_content), None
+            return cls._process_xlsx(file_content), None
 
         # Handle CSV files
         if ext == '.csv':
@@ -77,7 +77,7 @@ class FileProcessor:
 
         # Handle PowerPoint
         if ext == '.pptx':
-            return await cls._process_pptx(file_content), None
+            return cls._process_pptx(file_content), None
 
         # Handle plain text files
         if ext in {'.txt', '.md', '.py', '.js', '.ts', '.tsx', '.jsx', '.java',
@@ -89,7 +89,7 @@ class FileProcessor:
         return f"[Unsupported file type: {ext}]", None
 
     @staticmethod
-    async def _process_image(file_content: bytes, ext: str) -> Tuple[str, str]:
+    def _process_image(file_content: bytes, ext: str) -> tuple[str, str | None]:
         """Process image file and return description + base64 data."""
         try:
             # Validate image
@@ -116,7 +116,7 @@ class FileProcessor:
             return f"[Error processing image: {str(e)}]", None
 
     @staticmethod
-    async def _process_pdf(file_content: bytes) -> str:
+    def _process_pdf(file_content: bytes) -> str:
         """Extract text from PDF."""
         try:
             pdf_file = io.BytesIO(file_content)
@@ -137,7 +137,7 @@ class FileProcessor:
             return f"[Error processing PDF: {str(e)}]"
 
     @staticmethod
-    async def _process_docx(file_content: bytes) -> str:
+    def _process_docx(file_content: bytes) -> str:
         """Extract text from Word document."""
         try:
             doc_file = io.BytesIO(file_content)
@@ -168,7 +168,7 @@ class FileProcessor:
             return f"[Error processing DOCX: {str(e)}]"
 
     @staticmethod
-    async def _process_xlsx(file_content: bytes) -> str:
+    def _process_xlsx(file_content: bytes) -> str:
         """Extract text from Excel file."""
         try:
             xlsx_file = io.BytesIO(file_content)
@@ -201,7 +201,7 @@ class FileProcessor:
             return f"[Error processing XLSX: {str(e)}]"
 
     @staticmethod
-    async def _process_pptx(file_content: bytes) -> str:
+    def _process_pptx(file_content: bytes) -> str:
         """Extract text from PowerPoint presentation."""
         try:
             pptx_file = io.BytesIO(file_content)

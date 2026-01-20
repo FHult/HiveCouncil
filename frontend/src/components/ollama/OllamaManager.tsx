@@ -5,9 +5,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { config } from '@/lib/config';
-
-const API_BASE_URL = `${config.apiBaseUrl}/api`;
+import { API_URLS } from '@/lib/config';
 
 interface OllamaStatus {
   running: boolean;
@@ -48,7 +46,7 @@ export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) =
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ollama/status`);
+      const response = await fetch(API_URLS.ollamaStatus);
       const data = await response.json();
       setStatus(data);
     } catch {
@@ -58,7 +56,7 @@ export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) =
 
   const fetchInstalledModels = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ollama/models`);
+      const response = await fetch(API_URLS.ollamaModels);
       const data = await response.json();
       setInstalledModels(data.models || []);
     } catch {
@@ -68,7 +66,7 @@ export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) =
 
   const fetchRecommendedModels = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ollama/recommended`);
+      const response = await fetch(API_URLS.ollamaRecommended);
       const data = await response.json();
       setRecommendedModels(data.recommended || []);
     } catch {
@@ -95,7 +93,7 @@ export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) =
     setPullStatus((prev) => ({ ...prev, [modelName]: 'Pulling...' }));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/ollama/models/pull`, {
+      const response = await fetch(API_URLS.ollamaModelsPull, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_name: modelName }),
@@ -146,7 +144,7 @@ export const OllamaManager: React.FC<OllamaManagerProps> = ({ onModelChange }) =
 
   const handleDeleteModel = async (modelName: string) => {
     try {
-      await fetch(`${API_BASE_URL}/ollama/models/${encodeURIComponent(modelName)}`, {
+      await fetch(`${API_URLS.ollamaModels}/${encodeURIComponent(modelName)}`, {
         method: 'DELETE',
       });
       await fetchInstalledModels();

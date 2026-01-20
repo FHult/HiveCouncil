@@ -469,31 +469,11 @@ Please provide constructive feedback on this output. What could be improved? Wha
     async def _collect_initial_responses(
         self, session: Session
     ) -> AsyncGenerator[dict, None]:
-        """Collect initial responses from all configured providers in parallel."""
-        import json
-
-        providers = self.provider_factory.get_all_providers()
-        provider_names = self.provider_factory.get_provider_names()
-
-        if not providers:
-            return
-
-        # Filter providers based on selected_providers if specified
-        if session.selected_providers:
-            selected = json.loads(session.selected_providers)
-            filtered_providers = []
-            filtered_names = []
-            for provider, name in zip(providers, provider_names):
-                if name in selected:
-                    filtered_providers.append(provider)
-                    filtered_names.append(name)
-            providers = filtered_providers
-            provider_names = filtered_names
-
-        if not providers:
+        """Collect initial responses from all council members in parallel."""
+        if not self.council_members:
             yield {
                 "type": "error",
-                "message": "No providers selected or available for this session",
+                "message": "No council members configured for this session",
             }
             return
 
@@ -507,26 +487,15 @@ Please provide constructive feedback on this output. What could be improved? Wha
             except Exception as e:
                 return name, None, member_id, None, e
 
-        # Create tasks for all council members (supporting multiple members per provider)
+        # Create tasks for all council members
         tasks = []
-        if hasattr(self, 'council_members') and self.council_members:
-            # New council member system
-            for member in self.council_members:
-                provider = self.provider_factory.get_provider(member.provider)
-                if provider:
-                    system_prompt = self.member_personalities.get(member.id)
-                    tasks.append(get_response_with_name(
-                        provider, member.provider, member.id, member.model,
-                        session.prompt, temperature, system_prompt
-                    ))
-        else:
-            # Legacy provider system (backward compatibility) - DEPRECATED
-            logger.warning("Using deprecated legacy provider system. Please migrate to council_members.")
-            for provider, name in zip(providers, provider_names):
-                legacy_model = getattr(provider, 'model', None)
+        for member in self.council_members:
+            provider = self.provider_factory.get_provider(member.provider)
+            if provider:
+                system_prompt = self.member_personalities.get(member.id)
                 tasks.append(get_response_with_name(
-                    provider, name, f"legacy_{name}", legacy_model,
-                    session.prompt, temperature, None
+                    provider, member.provider, member.id, member.model,
+                    session.prompt, temperature, system_prompt
                 ))
 
         # Run all council members in parallel and yield results as they complete
@@ -546,11 +515,8 @@ Please provide constructive feedback on this output. What could be improved? Wha
                 content, input_tokens, output_tokens, cost = result
 
                 # Get member role for display
-                member_role = provider_name
-                if hasattr(self, 'council_members') and self.council_members:
-                    member = next((m for m in self.council_members if m.id == member_id), None)
-                    if member:
-                        member_role = member.role
+                member = next((m for m in self.council_members if m.id == member_id), None)
+                member_role = member.role if member else provider_name
 
                 # Save to database
                 response = Response(
@@ -591,163 +557,58 @@ Please provide constructive feedback on this output. What could be improved? Wha
         self, session: Session, merged_response: dict, iteration: int
     ) -> AsyncGenerator[dict, None]:
         """Collect feedback from council members on the merged response."""
-        import json
-
-        # Use council members system if available
-        if hasattr(self, 'council_members') and self.council_members:
-            # Create wrapper coroutines that return member info with result
-            async def get_feedback_with_member(provider, member_id, member_role, member_model, prompt, temp, system_prompt):
-                try:
-                    result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
-                    return member_id, member_role, member_model, result, None
-                except Exception as e:
-                    return member_id, member_role, None, None, e
-
-            temperature = self._get_temperature_for_session(session)
-
-            # Create tasks for all council members
-            tasks = []
-            for member in self.council_members:
-                provider = self.provider_factory.get_provider(member.provider)
-                if provider:
-                    # Get member's personality system prompt
-                    system_prompt = self.member_personalities.get(member.id)
-
-                    # Create feedback prompt
-                    feedback_prompt = f"""Please review and critique the following merged response:
-
-{merged_response['content']}
-
-Original prompt was: {session.prompt}
-
-Provide constructive feedback on:
-1. What works well
-2. What could be improved
-3. Any missing perspectives or considerations
-4. Specific suggestions for enhancement"""
-
-                    tasks.append(get_feedback_with_member(
-                        provider, member.id, member.role, member.model,
-                        feedback_prompt, temperature, system_prompt
-                    ))
-
-            # Run all members in parallel
-            for coro in asyncio.as_completed(tasks):
-                member_id, member_role, model, result, error = await coro
-
-                if error:
-                    yield {
-                        "type": "error",
-                        "member_id": member_id,
-                        "member_role": member_role,
-                        "message": f"Failed to get feedback: {str(error)}",
-                    }
-                    continue
-
-                try:
-                    content, input_tokens, output_tokens, cost = result
-
-                    # Save to database with member info
-                    response = Response(
-                        session_id=session.id,
-                        provider=member_id,  # Store member_id in provider field
-                        model=model,
-                        iteration=iteration,
-                        role="council",
-                        content=content,
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                        estimated_cost=cost,
-                    )
-                    self.db.add(response)
-                    await self.db.commit()
-                    await self.db.refresh(response)
-
-                    yield {
-                        "type": "feedback",
-                        "iteration": iteration,
-                        "provider": member_id,  # Use member_id as provider for consistency
-                        "member_id": member_id,
-                        "member_role": member_role,
-                        "content": content,
-                        "tokens": {"input": input_tokens, "output": output_tokens},
-                        "cost": cost,
-                        "done": True,
-                        "response_id": response.id,
-                    }
-
-                except Exception as e:
-                    yield {
-                        "type": "error",
-                        "member_id": member_id,
-                        "member_role": member_role,
-                        "message": f"Failed to get feedback: {str(e)}",
-                    }
-
+        if not self.council_members:
+            yield {
+                "type": "error",
+                "message": "No council members configured for this session",
+            }
             return
 
-        # Legacy provider system fallback - DEPRECATED
-        logger.warning("Using deprecated legacy provider system for feedback. Please migrate to council_members.")
-        providers = self.provider_factory.get_all_providers()
-        provider_names = self.provider_factory.get_provider_names()
-
-        if not providers:
-            return
-
-        # Filter providers based on selected_providers if specified
-        if session.selected_providers:
-            selected = json.loads(session.selected_providers)
-            filtered_providers = []
-            filtered_names = []
-            for provider, name in zip(providers, provider_names):
-                if name in selected:
-                    filtered_providers.append(provider)
-                    filtered_names.append(name)
-            providers = filtered_providers
-            provider_names = filtered_names
-
-        if not providers:
-            return
-
-        # Create feedback prompt
-        feedback_prompt = f"""Please review and critique the following merged response:
-
-{merged_response['content']}
-
-Original prompt was: {session.prompt}
-
-Provide constructive feedback on:
-1. What works well
-2. What could be improved
-3. Any missing perspectives or considerations
-4. Specific suggestions for enhancement"""
-
-        # Create wrapper coroutines that return provider name and model with result
-        async def get_feedback_with_name(provider, name, prompt, temp):
+        # Create wrapper coroutines that return member info with result
+        async def get_feedback_with_member(provider, member_id, member_role, member_model, prompt, temp, system_prompt):
             try:
-                result = await self._get_provider_response(provider, prompt, temp)
-                model = getattr(provider, 'model', 'unknown')
-                return name, model, result, None
+                result = await self._get_provider_response(provider, prompt, temp, system_prompt, model=member_model)
+                return member_id, member_role, member_model, result, None
             except Exception as e:
-                return name, None, None, e
+                return member_id, member_role, None, None, e
 
-        provider_names = self.provider_factory.get_provider_names()
         temperature = self._get_temperature_for_session(session)
 
-        # Create tasks for all providers
-        tasks = [
-            get_feedback_with_name(provider, name, feedback_prompt, temperature)
-            for provider, name in zip(providers, provider_names)
-        ]
+        # Create tasks for all council members
+        tasks = []
+        for member in self.council_members:
+            provider = self.provider_factory.get_provider(member.provider)
+            if provider:
+                # Get member's personality system prompt
+                system_prompt = self.member_personalities.get(member.id)
 
-        # Run all providers in parallel
+                # Create feedback prompt
+                feedback_prompt = f"""Please review and critique the following merged response:
+
+{merged_response['content']}
+
+Original prompt was: {session.prompt}
+
+Provide constructive feedback on:
+1. What works well
+2. What could be improved
+3. Any missing perspectives or considerations
+4. Specific suggestions for enhancement"""
+
+                tasks.append(get_feedback_with_member(
+                    provider, member.id, member.role, member.model,
+                    feedback_prompt, temperature, system_prompt
+                ))
+
+        # Run all members in parallel
         for coro in asyncio.as_completed(tasks):
-            provider_name, model, result, error = await coro
+            member_id, member_role, model, result, error = await coro
 
             if error:
                 yield {
                     "type": "error",
-                    "provider": provider_name,
+                    "member_id": member_id,
+                    "member_role": member_role,
                     "message": f"Failed to get feedback: {str(error)}",
                 }
                 continue
@@ -755,10 +616,10 @@ Provide constructive feedback on:
             try:
                 content, input_tokens, output_tokens, cost = result
 
-                # Save to database
+                # Save to database with member info
                 response = Response(
                     session_id=session.id,
-                    provider=provider_name,
+                    provider=member_id,  # Store member_id in provider field
                     model=model,
                     iteration=iteration,
                     role="council",
@@ -774,7 +635,9 @@ Provide constructive feedback on:
                 yield {
                     "type": "feedback",
                     "iteration": iteration,
-                    "provider": provider_name,
+                    "provider": member_id,  # Use member_id as provider for consistency
+                    "member_id": member_id,
+                    "member_role": member_role,
                     "content": content,
                     "tokens": {"input": input_tokens, "output": output_tokens},
                     "cost": cost,
@@ -785,7 +648,8 @@ Provide constructive feedback on:
             except Exception as e:
                 yield {
                     "type": "error",
-                    "provider": provider_name,
+                    "member_id": member_id,
+                    "member_role": member_role,
                     "message": f"Failed to get feedback: {str(e)}",
                 }
 
@@ -802,12 +666,12 @@ Provide constructive feedback on:
             }
             return
 
-        # Get chair's personality system prompt, model, and role if using council members
+        # Get chair's personality system prompt, model, and role from council members
         chair_system_prompt = None
         chair_member_id = None
         chair_member_role = None
         chair_model = None
-        if hasattr(self, 'council_members') and self.council_members:
+        if self.council_members:
             chair_member = next((m for m in self.council_members if m.is_chair), None)
             if chair_member:
                 chair_system_prompt = self.member_personalities.get(chair_member.id)

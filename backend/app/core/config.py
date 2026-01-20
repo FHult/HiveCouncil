@@ -29,7 +29,10 @@ class Settings(BaseSettings):
     grok_model: str | None = None
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./hivecouncil.db"
+    database_url: str = "sqlite+aiosqlite:///./llmings.db"
+
+    # Ollama configuration
+    ollama_base_url: str = "http://localhost:11434"
 
     # Default Settings
     default_chair: str = "anthropic"

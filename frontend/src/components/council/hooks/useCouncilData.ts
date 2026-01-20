@@ -1,7 +1,7 @@
 /**
  * Hook for fetching council-related data (archetypes, RAM info, templates)
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { API_URLS } from '@/lib/config';
 import type { PersonalityArchetype } from '@/types';
@@ -35,36 +35,7 @@ export function useCouncilData(): UseCouncilDataReturn {
   const [archetypes, setArchetypes] = useState<PersonalityArchetype[]>([]);
   const [modelRAMInfo, setModelRAMInfo] = useState<ModelRAMInfo>({});
   const [templates, setTemplates] = useState<CouncilTemplate[]>([]);
-
-  const fetchArchetypes = async () => {
-    try {
-      const response = await fetch(API_URLS.archetypes);
-      const data = await response.json();
-      setArchetypes(data.archetypes || []);
-    } catch {
-      toast.error('Failed to load personality archetypes');
-    }
-  };
-
-  const fetchRAMInfo = async () => {
-    try {
-      const response = await fetch(API_URLS.systemRamStatus);
-      if (response.ok) {
-        const data = await response.json();
-        // Build a map of model name -> RAM info using all_models (not just recommended)
-        const ramMap: ModelRAMInfo = {};
-        data.all_models?.forEach((model: ModelData) => {
-          ramMap[model.name] = {
-            ram_required: model.ram_required,
-            can_run: model.can_run,
-          };
-        });
-        setModelRAMInfo(ramMap);
-      }
-    } catch {
-      // Silently fail - RAM info is optional
-    }
-  };
+  const hasShownError = useRef(false);
 
   const fetchTemplates = async () => {
     try {
@@ -139,9 +110,60 @@ export function useCouncilData(): UseCouncilDataReturn {
   };
 
   useEffect(() => {
-    fetchArchetypes();
-    fetchRAMInfo();
-    fetchTemplates();
+    let isMounted = true;
+
+    const loadData = async () => {
+      // Always try to fetch archetypes
+      try {
+        const response = await fetch(API_URLS.archetypes);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (isMounted) {
+          setArchetypes(data.archetypes || []);
+        }
+      } catch (error) {
+        console.error('Failed to load archetypes:', error);
+        if (isMounted && !hasShownError.current) {
+          hasShownError.current = true;
+          toast.error('Failed to load personality archetypes');
+        }
+      }
+
+      // Fetch RAM info (optional)
+      try {
+        const response = await fetch(API_URLS.systemRamStatus);
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          const ramMap: ModelRAMInfo = {};
+          data.all_models?.forEach((model: ModelData) => {
+            ramMap[model.name] = {
+              ram_required: model.ram_required,
+              can_run: model.can_run,
+            };
+          });
+          setModelRAMInfo(ramMap);
+        }
+      } catch {
+        // Silently fail - RAM info is optional
+      }
+
+      // Fetch templates (optional)
+      try {
+        const response = await fetch(API_URLS.templates);
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          setTemplates(data);
+        }
+      } catch {
+        // Silently fail - templates are optional
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return {

@@ -25,6 +25,7 @@ export interface PersonalityArchetype {
   name: string;
   description: string;
   emoji: string;
+  recommended_models?: string[];
 }
 
 export interface CouncilMember {

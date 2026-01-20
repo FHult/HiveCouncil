@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import APIKeyModal from './APIKeyModal';
+import { API_URLS } from '@/lib/config';
+import {
+  PROVIDER_DISPLAY_NAMES,
+  PROVIDER_DESCRIPTIONS,
+} from '@/lib/providers';
 
 interface Provider {
   name: string;
@@ -15,22 +20,6 @@ interface ProviderSelectorProps {
   chair: string;
   onChairChange: (chair: string) => void;
 }
-
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Google Gemini',
-  grok: 'Grok',
-  ollama: 'Ollama (Local)',
-};
-
-const PROVIDER_DESCRIPTIONS: Record<string, string> = {
-  openai: 'GPT-4, GPT-4o - Industry leading models',
-  anthropic: 'Claude - Long context, strong reasoning',
-  google: 'Gemini - Free tier available',
-  grok: 'Grok - X.AI models',
-  ollama: 'Local LLMs - No cost, private',
-};
 
 export default function ProviderSelector({
   selectedProviders,
@@ -48,7 +37,7 @@ export default function ProviderSelector({
 
   const fetchProviders = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/providers');
+      const response = await fetch(API_URLS.providers);
       const data = await response.json();
 
       // Extract providers object from API response

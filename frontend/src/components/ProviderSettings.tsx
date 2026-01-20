@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import APIKeyModal from './APIKeyModal';
 import { OllamaManager } from './ollama/OllamaManager';
 import { useProvidersStore } from '@/store/providersStore';
+import { API_URLS } from '@/lib/config';
+import {
+  PROVIDER_DISPLAY_NAMES,
+  PROVIDER_DESCRIPTIONS,
+  PROVIDER_DOCS,
+} from '@/lib/providers';
 
 interface Provider {
   name: string;
@@ -45,30 +51,6 @@ interface RAMStatus {
   }>;
 }
 
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Google Gemini',
-  grok: 'Grok',
-  ollama: 'Ollama (Local)',
-};
-
-const PROVIDER_DESCRIPTIONS: Record<string, string> = {
-  openai: 'GPT-4, GPT-4o - Industry leading models with strong reasoning',
-  anthropic: 'Claude - Long context window, excellent for complex analysis',
-  google: 'Gemini - Free tier available, multimodal capabilities',
-  grok: 'Grok - X.AI models with real-time information',
-  ollama: 'Local LLMs - No cost, complete privacy, runs on your machine',
-};
-
-const PROVIDER_DOCS: Record<string, string> = {
-  openai: 'https://platform.openai.com/docs',
-  anthropic: 'https://docs.anthropic.com/',
-  google: 'https://ai.google.dev/docs',
-  grok: 'https://docs.x.ai/',
-  ollama: 'https://ollama.ai/',
-};
-
 export default function ProviderSettings() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +68,7 @@ export default function ProviderSettings() {
   const fetchRAMStatus = async () => {
     setRamLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/system/ram-status');
+      const response = await fetch(API_URLS.systemRamStatus);
       if (response.ok) {
         const data = await response.json();
         setRamStatus(data);
@@ -100,7 +82,7 @@ export default function ProviderSettings() {
 
   const fetchProviders = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/providers');
+      const response = await fetch(API_URLS.providers);
       const data = await response.json();
       const providersData = data.providers || data;
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URLS } from '@/lib/config';
 
 interface APIKeyModalProps {
   provider: string;
@@ -53,7 +54,7 @@ export default function APIKeyModal({
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/config/api-key', {
+      const response = await fetch(API_URLS.configApiKey, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

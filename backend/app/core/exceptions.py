@@ -74,3 +74,47 @@ class ServiceUnavailableError(AIProviderError):
 
     def __init__(self, message: str = "Service temporarily unavailable", provider: str | None = None):
         super().__init__(message, provider)
+
+
+# Application-level exceptions
+
+class LLMingsError(Exception):
+    """Base exception for LLMings application errors."""
+
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+
+class ValidationError(LLMingsError):
+    """Raised when input validation fails."""
+
+    def __init__(self, message: str, field: str | None = None):
+        self.field = field
+        super().__init__(message, status_code=400)
+
+
+class NotFoundError(LLMingsError):
+    """Raised when a requested resource is not found."""
+
+    def __init__(self, resource: str, identifier: str | None = None):
+        self.resource = resource
+        self.identifier = identifier
+        message = f"{resource} not found" if not identifier else f"{resource} '{identifier}' not found"
+        super().__init__(message, status_code=404)
+
+
+class ConfigurationError(LLMingsError):
+    """Raised when there's a configuration issue."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status_code=500)
+
+
+class SessionError(LLMingsError):
+    """Raised when there's an error with a council session."""
+
+    def __init__(self, message: str, session_id: str | None = None):
+        self.session_id = session_id
+        super().__init__(message, status_code=400)

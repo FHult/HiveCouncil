@@ -97,8 +97,7 @@ export default function CouncilMemberEditor({
 
     // Get recommended models for this archetype
     const archetype = archetypes.find((a) => a.id === newArchetype);
-    const recommendedModels =
-      (archetype as typeof archetype & { recommended_models?: string[] })?.recommended_models || [];
+    const recommendedModels = archetype?.recommended_models || [];
 
     // Auto-select first recommended model if using Ollama and a recommended model is available
     let modelUpdate = {};

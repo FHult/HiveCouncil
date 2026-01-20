@@ -51,7 +51,7 @@ def write_env_file(env_vars: dict[str, str]) -> None:
     env_path = get_env_file_path()
 
     with open(env_path, 'w') as f:
-        f.write("# HiveCouncil Environment Variables\n\n")
+        f.write("# LLMings Environment Variables\n\n")
 
         # API Keys section
         f.write("# AI Provider API Keys\n")
@@ -63,7 +63,7 @@ def write_env_file(env_vars: dict[str, str]) -> None:
         if 'DATABASE_URL' in env_vars:
             f.write(f"DATABASE_URL={env_vars['DATABASE_URL']}\n")
         else:
-            f.write("DATABASE_URL=sqlite+aiosqlite:///./hivecouncil.db\n")
+            f.write("DATABASE_URL=sqlite+aiosqlite:///./llmings.db\n")
 
         f.write("\n# CORS Origins\n")
         if 'CORS_ORIGINS' in env_vars:

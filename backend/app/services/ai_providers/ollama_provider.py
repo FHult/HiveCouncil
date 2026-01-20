@@ -4,6 +4,7 @@ import httpx
 import psutil
 from typing import AsyncGenerator
 from .base import AIProvider
+from app.core.config import settings
 from app.core.constants import PRICING, PROVIDER_CONFIGS
 from app.core.exceptions import (
     AIProviderError,
@@ -42,10 +43,10 @@ class OllamaProvider(AIProvider):
         "llava": {"general": 7, "coding": 5, "reasoning": 6, "creative": 6},
     }
 
-    def __init__(self, api_key: str = "not-needed", model: str | None = None, base_url: str = "http://localhost:11434"):
+    def __init__(self, api_key: str = "not-needed", model: str | None = None, base_url: str | None = None):
         """Initialize Ollama provider."""
         super().__init__(api_key, model)
-        self.base_url = base_url
+        self.base_url = base_url or settings.ollama_base_url
         self.name = "ollama"
         self.client = httpx.AsyncClient(timeout=60.0)  # 60 second timeout for local models
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { useSessionStore } from '@/store/sessionStore';
 import { useProvidersStore } from '@/store/providersStore';
 import { sessionApi } from '@/lib/api';
 import { PromptInput } from '@/components/prompt/PromptInput';
@@ -13,7 +12,6 @@ type TabType = 'council' | 'settings';
 function App() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [activeTab, setActiveTab] = useState<TabType>('council');
-  const { status: sessionStatus } = useSessionStore();
   const { loadProviders } = useProvidersStore();
 
   // Test backend connection and load providers on mount

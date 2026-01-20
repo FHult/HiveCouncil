@@ -2,13 +2,8 @@
  * Helper utilities for council member editor components
  */
 
-export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Google Gemini',
-  grok: 'Grok',
-  ollama: 'Ollama',
-};
+// Re-export provider utilities from centralized location
+export { PROVIDER_DISPLAY_NAMES, getProviderDisplayName } from '@/lib/providers';
 
 export const CHAIR_RECOMMENDED_ARCHETYPES = ['synthesizer', 'strategist', 'balanced', 'analyst'];
 
@@ -17,13 +12,6 @@ export const CHAIR_RECOMMENDED_ARCHETYPES = ['synthesizer', 'strategist', 'balan
  */
 export const generateMemberId = (): string => {
   return `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-/**
- * Get display name for a provider
- */
-export const getProviderDisplayName = (providerName: string): string => {
-  return PROVIDER_DISPLAY_NAMES[providerName] || providerName;
 };
 
 /**

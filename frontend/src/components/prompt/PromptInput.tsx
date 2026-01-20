@@ -16,7 +16,7 @@ export function PromptInput() {
   const [preset, setPreset] = useState<Preset>('balanced');
   const [files, setFiles] = useState<FileAttachment[]>([]);
 
-  const { startSession, status, error } = useSessionStore();
+  const { startSession, status } = useSessionStore();
   const isStreaming = status === 'running';
   const { providers } = useProvidersStore();
 

@@ -4,8 +4,9 @@
  */
 
 export const config = {
-  // API Base URL - defaults to localhost:8000 if not set
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  // API Base URL - use empty string for relative URLs (works with Vite proxy in dev)
+  // In production, set VITE_API_BASE_URL to the actual backend URL
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
 
   // API endpoint paths
   api: {
@@ -35,8 +36,10 @@ export const API_URLS = {
   systemRamStatus: getApiUrl(`${config.api.system}/ram-status`),
   ollamaStatus: getApiUrl(`${config.api.ollama}/status`),
   ollamaModels: getApiUrl(`${config.api.ollama}/models`),
+  ollamaModelsPull: getApiUrl(`${config.api.ollama}/models/pull`),
   ollamaRecommended: getApiUrl(`${config.api.ollama}/recommended`),
   uploadFile: getApiUrl(`${config.api.files}/upload`),
+  configApiKey: getApiUrl('/api/config/api-key'),
 } as const;
 
 // Validation limits (should match backend)

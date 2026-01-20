@@ -33,7 +33,7 @@ export function MemberForm({
 
   const getRecommendedModelsForArchetype = (archetypeId: string): string[] => {
     const archetype = archetypes.find((a) => a.id === archetypeId);
-    return (archetype as PersonalityArchetype & { recommended_models?: string[] })?.recommended_models || [];
+    return archetype?.recommended_models || [];
   };
 
   return (

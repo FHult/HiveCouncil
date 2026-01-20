@@ -38,7 +38,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Process the file
     try:
-        extracted_text, base64_data = await FileProcessor.process_file(content, file.filename)
+        extracted_text, base64_data = FileProcessor.process_file(content, file.filename)
 
         return FileAttachment(
             filename=file.filename,
